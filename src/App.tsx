@@ -97,7 +97,7 @@ export default function App() {
             >
               <div className="w-8 h-8 bg-accent rounded-md shrink-0" />
               <h1 className="text-lg font-extrabold tracking-tight text-white">
-                EduPro MS
+                Al-Naseeha High
               </h1>
             </motion.div>
           )}
@@ -156,11 +156,11 @@ export default function App() {
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
-              <div className="text-sm font-semibold text-foreground">Admin Portal</div>
-              <div className="text-[11px] text-muted-foreground">Session: 2023-24</div>
+              <div className="text-sm font-semibold text-foreground">Muhammad Jahanzeb</div>
+              <div className="text-[11px] text-muted-foreground">Principal | Session: 2023-24</div>
             </div>
             <Avatar className="h-8 w-8 bg-accent text-white font-bold text-xs">
-              <AvatarFallback className="bg-accent text-white">AD</AvatarFallback>
+              <AvatarFallback className="bg-accent text-white">MJ</AvatarFallback>
             </Avatar>
           </div>
         </header>
