@@ -49,6 +49,12 @@ import {
 
 type View = 'dashboard' | 'students' | 'teachers' | 'attendance' | 'fees' | 'exams' | 'announcements';
 
+const SCHOOL_CLASSES = [
+  'Play Group', 'Nursery', 'KG', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'
+];
+
+const SCHOOL_LOGO = "https://i.ibb.co/vzN89vG/school-logo.png"; // Placeholder - User should replace with actual uploaded logo path
+
 export default function App() {
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -75,13 +81,13 @@ export default function App() {
       case 'dashboard':
         return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} />;
       case 'students':
-        return <StudentsView students={students} onAddStudent={(s) => setStudents([...students, s])} />;
+        return <StudentsView students={students} onAddStudent={(s) => setStudents(prev => prev.some(item => item.id === s.id) ? prev.map(item => item.id === s.id ? s : item) : [...prev, s])} />;
       case 'teachers':
         return (
           <TeachersView 
             teachers={teachers} 
             payroll={payroll}
-            onAddTeacher={(t) => setTeachers([...teachers, t])}
+            onAddTeacher={(t) => setTeachers(prev => prev.some(item => item.id === t.id) ? prev.map(item => item.id === t.id ? t : item) : [...prev, t])}
             onGeneratePayroll={(p) => setPayroll([...payroll, p])}
           />
         );
@@ -104,7 +110,7 @@ export default function App() {
       <aside 
         className={`bg-sidebar text-sidebar-foreground transition-all duration-300 ease-in-out flex flex-col ${
           isSidebarOpen ? 'w-[240px]' : 'w-20'
-        } fixed inset-y-0 left-0 z-50 border-r border-sidebar-border`}
+        } fixed inset-y-0 left-0 z-50 border-r border-sidebar-border no-print`}
       >
         <div className="p-6 flex items-center justify-between">
           {isSidebarOpen && (
@@ -164,7 +170,7 @@ export default function App() {
 
       {/* Main Content */}
       <main className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'ml-[240px]' : 'ml-20'}`}>
-        <header className="h-16 bg-white border-b border-border px-8 flex items-center justify-between sticky top-0 z-40">
+        <header className="h-16 bg-white border-b border-border px-8 flex items-center justify-between sticky top-0 z-40 no-print">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
             <Input 
@@ -325,10 +331,7 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
     });
   }, [students, filterClass, searchQuery]);
 
-  const uniqueClasses = useMemo(() => {
-    const classes = new Set(students.map(s => s.grade));
-    return Array.from(classes);
-  }, [students]);
+  const uniqueClasses = SCHOOL_CLASSES;
 
   const handlePrint = () => {
     window.print();
@@ -441,7 +444,14 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid grid-cols-2 items-center gap-2">
                   <Label htmlFor="grade" className="text-right text-xs">Grade</Label>
-                  <Input id="grade" value={formData.grade} onChange={(e) => setFormData({...formData, grade: e.target.value})} className="h-8 text-xs" required />
+                  <Select value={formData.grade} onValueChange={(v) => setFormData({...formData, grade: v})}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Grade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SCHOOL_CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid grid-cols-2 items-center gap-2">
                   <Label htmlFor="section" className="text-right text-xs">Sec</Label>
@@ -456,7 +466,10 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
         </Dialog>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="print-only mb-8 text-center p-6 border-b-2 border-primary">
+        <div className="print-only mb-8 text-center p-6 border-b-2 border-primary relative">
+          <div className="absolute left-6 top-6 h-20 w-20">
+             <img src={SCHOOL_LOGO} alt="School Logo" className="w-full h-full object-contain" />
+          </div>
           <h1 className="text-3xl font-extrabold uppercase tracking-tighter text-primary">Al-Naseeha High School</h1>
           <h2 className="text-xl font-bold mt-2">Student List - {filterClass === 'all' ? 'All Classes' : `Grade ${filterClass}`}</h2>
           <p className="text-sm text-muted-foreground mt-1 text-center">Generated on: {new Date().toLocaleDateString()}</p>
@@ -513,12 +526,63 @@ function TeachersView({
 }) {
   const [view, setView] = useState<'staff' | 'payroll'>('staff');
   const [openPayroll, setOpenPayroll] = useState(false);
+  const [openAddStaff, setOpenAddStaff] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<Teacher | null>(null);
+  const [staffForm, setStaffForm] = useState({
+    name: '',
+    designation: '',
+    employeeId: '',
+    contactNumber: '',
+    baseSalary: '',
+    qualification: ''
+  });
+  
   const [payrollForm, setPayrollForm] = useState({
     bonus: '0',
     deductions: '0',
     month: 'May',
   });
+
+  const handleAddStaff = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newStaff: Teacher = {
+      id: Math.random().toString(36).substr(2, 9),
+      email: `${staffForm.name.toLowerCase().replace(/\s/g, '')}@school.com`,
+      role: 'teacher',
+      name: staffForm.name,
+      designation: staffForm.designation,
+      employeeId: staffForm.employeeId,
+      contactNumber: staffForm.contactNumber,
+      baseSalary: Number(staffForm.baseSalary),
+      qualification: staffForm.qualification,
+      createdAt: new Date().toISOString(),
+    };
+    onAddTeacher(newStaff);
+    setOpenAddStaff(false);
+    setStaffForm({ name: '', designation: '', employeeId: '', contactNumber: '', baseSalary: '', qualification: '' });
+  };
+
+  const handleEditStaff = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStaff) return;
+    
+    const updatedStaff: Teacher = {
+      ...selectedStaff,
+      name: staffForm.name,
+      designation: staffForm.designation,
+      employeeId: staffForm.employeeId,
+      contactNumber: staffForm.contactNumber,
+      baseSalary: Number(staffForm.baseSalary),
+      qualification: staffForm.qualification,
+    };
+    
+    // In a real app we'd call an update function. for now we just add to show it works or the user can refresh
+    // Since we don't have an onUpdateTeacher prop yet, I'll just use onAddTeacher or inform the user
+    // Fixed: I'll add onUpdateTeacher or just replace in local state if I had access, but I'll use onAddTeacher for now as a placeholder or assume it handles both
+    onAddTeacher(updatedStaff); 
+    setSelectedStaff(null);
+    setStaffForm({ name: '', designation: '', employeeId: '', contactNumber: '', baseSalary: '', qualification: '' });
+  };
 
   const handleGeneratePayroll = (e: React.FormEvent) => {
     e.preventDefault();
@@ -558,9 +622,14 @@ function TeachersView({
       const staff = teachers.find(t => t.employeeId === p.employeeId);
       return `
         <div class="salary-slip">
-          <div style="text-align:center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
-            <h2 style="margin:0;">Al-Naseeha High School</h2>
-            <p style="margin:5px 0;">Salary Slip - ${p.month} ${p.year}</p>
+          <div style="display:flex; align-items:center; gap:15px; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
+             <div style="width:60px; height:60px; display:flex; align-items:center; justify-content:center;">
+                <img src="${SCHOOL_LOGO}" alt="Logo" style="max-width:100%; max-height:100%; object-fit:contain;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/2913/2913008.png'">
+             </div>
+             <div style="text-align:center; flex:1; margin-right:60px;">
+                <h2 style="margin:0; font-size:18px; color:#1e293b; text-transform:uppercase;">Al-Naseeha High School</h2>
+                <p style="margin:5px 0; font-size:12px; font-weight:bold; color:#3b82f6;">Salary Slip - ${p.month} ${p.year}</p>
+             </div>
           </div>
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:12px;">
             <div><strong>Staff Name:</strong> ${staff?.name}</div>
@@ -628,9 +697,48 @@ function TeachersView({
         </div>
         <div>
           {view === 'staff' ? (
-            <Button className="bg-accent text-white h-9 text-xs">
-              <Plus size={16} className="mr-2" /> Add Staff Member
-            </Button>
+            <Dialog open={openAddStaff} onOpenChange={setOpenAddStaff}>
+              <DialogTrigger render={
+                <Button className="bg-accent text-white h-9 text-xs">
+                  <Plus size={16} className="mr-2" /> Add Staff Member
+                </Button>
+              } />
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Add New Staff Member</DialogTitle>
+                  <DialogDescription>Enter employment details for the new staff member.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddStaff} className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="staffName" className="text-right text-xs">Name</Label>
+                    <Input id="staffName" value={staffForm.name} onChange={(e) => setStaffForm({...staffForm, name: e.target.value})} className="col-span-3 h-8 text-xs" required />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="desig" className="text-right text-xs">Designation</Label>
+                    <Input id="desig" value={staffForm.designation} onChange={(e) => setStaffForm({...staffForm, designation: e.target.value})} className="col-span-3 h-8 text-xs" required />
+                  </div>
+                   <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="empId" className="text-right text-xs">Employee ID</Label>
+                    <Input id="empId" value={staffForm.employeeId} onChange={(e) => setStaffForm({...staffForm, employeeId: e.target.value})} className="col-span-3 h-8 text-xs" required />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="staffContact" className="text-right text-xs">Contact</Label>
+                    <Input id="staffContact" value={staffForm.contactNumber} onChange={(e) => setStaffForm({...staffForm, contactNumber: e.target.value})} className="col-span-3 h-8 text-xs" required />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="baseSal" className="text-right text-xs">Base Salary</Label>
+                    <Input id="baseSal" type="number" value={staffForm.baseSalary} onChange={(e) => setStaffForm({...staffForm, baseSalary: e.target.value})} className="col-span-3 h-8 text-xs" required />
+                  </div>
+                   <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="qual" className="text-right text-xs">Qualification</Label>
+                    <Input id="qual" value={staffForm.qualification} onChange={(e) => setStaffForm({...staffForm, qualification: e.target.value})} className="col-span-3 h-8 text-xs" required />
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" className="bg-accent h-8 text-xs w-full">Save Staff Member</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           ) : (
             <Button variant="outline" onClick={() => handlePrintSalarySlips()} className="h-9 text-xs border-border">
               <Printer size={16} className="mr-1" /> Print All Slips (A4)
@@ -680,7 +788,24 @@ function TeachersView({
                   >
                     <DollarSign size={14} className="mr-1" /> Payroll
                   </Button>
-                  <Button variant="outline" size="sm" className="flex-1 text-[11px] h-8 border-border">Profile</Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 text-[11px] h-8 border-border hover:bg-accent hover:text-white"
+                    onClick={() => {
+                      setStaffForm({
+                        name: teacher.name,
+                        designation: teacher.designation,
+                        employeeId: teacher.employeeId,
+                        contactNumber: teacher.contactNumber,
+                        baseSalary: teacher.baseSalary?.toString() || '',
+                        qualification: teacher.qualification
+                      });
+                      setSelectedStaff(teacher);
+                    }}
+                  >
+                    Edit Profile
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -786,6 +911,45 @@ function TeachersView({
             </div>
             <DialogFooter className="pt-4">
               <Button type="submit" className="bg-primary w-full h-10 text-xs font-bold uppercase tracking-wider">Generate Slip & Finalize</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Staff Dialog */}
+      <Dialog open={!!selectedStaff && !openPayroll} onOpenChange={(open) => !open && setSelectedStaff(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Staff Profile</DialogTitle>
+            <DialogDescription>Update the details for {selectedStaff?.name}.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditStaff} className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="editName" className="text-right text-xs">Name</Label>
+              <Input id="editName" value={staffForm.name} onChange={(e) => setStaffForm({...staffForm, name: e.target.value})} className="col-span-3 h-8 text-xs" required />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="editDesig" className="text-right text-xs">Designation</Label>
+              <Input id="editDesig" value={staffForm.designation} onChange={(e) => setStaffForm({...staffForm, designation: e.target.value})} className="col-span-3 h-8 text-xs" required />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="editEmpId" className="text-right text-xs">Employee ID</Label>
+              <Input id="editEmpId" value={staffForm.employeeId} onChange={(e) => setStaffForm({...staffForm, employeeId: e.target.value})} className="col-span-3 h-8 text-xs" required />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="editContact" className="text-right text-xs">Contact</Label>
+              <Input id="editContact" value={staffForm.contactNumber} onChange={(e) => setStaffForm({...staffForm, contactNumber: e.target.value})} className="col-span-3 h-8 text-xs" required />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="editSalary" className="text-right text-xs">Base Salary</Label>
+              <Input id="editSalary" type="number" value={staffForm.baseSalary} onChange={(e) => setStaffForm({...staffForm, baseSalary: e.target.value})} className="col-span-3 h-8 text-xs" required />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="editQual" className="text-right text-xs">Qualification</Label>
+              <Input id="editQual" value={staffForm.qualification} onChange={(e) => setStaffForm({...staffForm, qualification: e.target.value})} className="col-span-3 h-8 text-xs" required />
+            </div>
+            <DialogFooter>
+              <Button type="submit" className="bg-accent h-8 text-xs w-full">Update Staff Member</Button>
             </DialogFooter>
           </form>
         </DialogContent>
