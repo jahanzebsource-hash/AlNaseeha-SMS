@@ -48,7 +48,7 @@ export interface Attendance {
   id: string;
   studentId: string;
   date: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'leave';
   markedBy: string;
 }
 

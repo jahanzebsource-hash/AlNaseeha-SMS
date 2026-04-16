@@ -20,7 +20,10 @@ import {
   Plus,
   Filter,
   Printer,
-  DollarSign
+  DollarSign,
+  MessageCircle,
+  Trophy,
+  Star
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -38,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Student, Teacher, PayrollRecord } from './types';
+import { Student, Teacher, PayrollRecord, Attendance, FeeRecord } from './types';
 import { 
   mockStudents, 
   mockTeachers, 
@@ -61,6 +64,8 @@ export default function App() {
   const [students, setStudents] = useState<Student[]>(mockStudents);
   const [teachers, setTeachers] = useState<Teacher[]>(mockTeachers);
   const [payroll, setPayroll] = useState<PayrollRecord[]>([]);
+  const [attendance, setAttendance] = useState<Attendance[]>(mockAttendance as Attendance[]);
+  const [feeRecords, setFeeRecords] = useState<FeeRecord[]>(mockFees as FeeRecord[]);
 
   const totalMonthlyFee = useMemo(() => {
     return students.reduce((sum, student) => sum + student.monthlyFee, 0);
@@ -92,9 +97,36 @@ export default function App() {
           />
         );
       case 'attendance':
-        return <AttendanceView students={students} />;
+        return (
+          <AttendanceView 
+            students={students} 
+            attendance={attendance}
+            onMarkAttendance={(sId, status) => {
+              const today = new Date().toISOString().split('T')[0];
+              setAttendance(prev => {
+                const existing = prev.find(a => a.studentId === sId && a.date === today);
+                if (existing) {
+                  return prev.map(a => a.id === existing.id ? { ...a, status } : a);
+                }
+                return [...prev, {
+                  id: Math.random().toString(36).substr(2, 9),
+                  studentId: sId,
+                  status,
+                  date: today,
+                  markedBy: 'Admin'
+                }];
+              });
+            }}
+          />
+        );
       case 'fees':
-        return <FeesView students={students} />;
+        return (
+          <FeesView 
+            students={students} 
+            feeRecords={feeRecords} 
+            onRecordFee={(record) => setFeeRecords(prev => [...prev, record])}
+          />
+        );
       case 'exams':
         return <ExamsView students={students} />;
       case 'announcements':
@@ -211,7 +243,7 @@ function DashboardView({ totalMonthlyFee, recentStudents }: { totalMonthlyFee: n
   const stats = [
     { label: 'Total Students', value: recentStudents.length.toString(), delta: '+24 this month', icon: Users, color: 'text-blue-600' },
     { label: 'Active Teachers', value: '86', delta: '98% Attendance', icon: UserSquare2, color: 'text-emerald-600' },
-    { label: 'Monthly Income', value: `$${totalMonthlyFee.toLocaleString()}`, delta: 'Total Fee Demand', icon: CreditCard, color: 'text-amber-600' },
+    { label: 'Monthly Income', value: `Rs.${totalMonthlyFee.toLocaleString()}`, delta: 'Total Fee Demand', icon: CreditCard, color: 'text-amber-600' },
     { label: 'Daily Attendance', value: '94.2%', delta: 'Trending upwards', icon: CalendarCheck, color: 'text-purple-600' },
   ];
 
@@ -340,6 +372,7 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
   const [formData, setFormData] = useState({
     name: '',
     parentName: '',
+    parentContact: '',
     dateOfBirth: '',
     monthlyFee: '',
     grade: '',
@@ -355,18 +388,18 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
       role: 'student',
       name: formData.name,
       parentName: formData.parentName,
+      parentContact: formData.parentContact,
       dateOfBirth: formData.dateOfBirth,
       monthlyFee: Number(formData.monthlyFee),
       grade: formData.grade,
       section: formData.section,
       rollNumber: formData.rollNumber,
-      parentContact: '',
       address: '',
       createdAt: new Date().toISOString(),
     };
     onAddStudent(newStudent);
     setOpen(false);
-    setFormData({ name: '', parentName: '', dateOfBirth: '', monthlyFee: '', grade: '', section: '', rollNumber: '' });
+    setFormData({ name: '', parentName: '', parentContact: '', dateOfBirth: '', monthlyFee: '', grade: '', section: '', rollNumber: '' });
   };
 
   return (
@@ -428,6 +461,10 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="parent" className="text-right text-xs">Father Name</Label>
                 <Input id="parent" value={formData.parentName} onChange={(e) => setFormData({...formData, parentName: e.target.value})} className="col-span-3 h-8 text-xs" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="contact" className="text-right text-xs">Mobile No</Label>
+                <Input id="contact" placeholder="e.g. 923001234567" value={formData.parentContact} onChange={(e) => setFormData({...formData, parentContact: e.target.value})} className="col-span-3 h-8 text-xs" required />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="dob" className="text-right text-xs">D.O.B</Label>
@@ -498,7 +535,7 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
                   <td className="px-6 py-4 text-muted-foreground">{student.rollNumber}</td>
                   <td className="px-6 py-4 text-muted-foreground">{student.grade} - {student.section}</td>
                   <td className="px-6 py-4 text-muted-foreground">{student.parentName}</td>
-                  <td className="px-6 py-4 text-muted-foreground font-bold">${student.monthlyFee}</td>
+                  <td className="px-6 py-4 text-muted-foreground font-bold">Rs.{student.monthlyFee}</td>
                   <td className="px-6 py-4 no-print">
                     <Button variant="ghost" size="sm" className="text-accent hover:text-accent/80 hover:bg-accent/10 text-[11px] h-7">Edit</Button>
                   </td>
@@ -642,17 +679,17 @@ function TeachersView({
               <span>Earnings</span><span>Amount</span>
             </div>
             <div style="display:grid; grid-template-columns: 2fr 1fr; border-bottom:1px solid #eee; padding:5px;">
-              <span>Base Salary</span><span>$${p.baseSalary}</span>
+              <span>Base Salary</span><span>Rs.${p.baseSalary}</span>
             </div>
             <div style="display:grid; grid-template-columns: 2fr 1fr; border-bottom:1px solid #eee; padding:5px;">
-              <span>Bonus</span><span>$${p.bonus}</span>
+              <span>Bonus</span><span>Rs.${p.bonus}</span>
             </div>
             <div style="display:grid; grid-template-columns: 2fr 1fr; background:#f9f9f9; padding:5px; font-weight:bold;">
-              <span>Deductions</span><span>-$${p.deductions}</span>
+              <span>Deductions</span><span>-Rs.${p.deductions}</span>
             </div>
           </div>
           <div style="margin-top:15px; text-align:right; font-size:16px; font-weight:bold; color:#1e293b;">
-            Net Salary: $${p.netSalary}
+            Net Salary: Rs.${p.netSalary}
           </div>
           <div style="margin-top:30px; display:flex; justify-content:space-between; font-size:10px;">
             <div style="border-top:1px solid #000; padding-top:5px; width:120px; text-align:center;">Employee Signature</div>
@@ -958,107 +995,408 @@ function TeachersView({
   );
 }
 
-function AttendanceView({ students }: { students: Student[] }) {
+function AttendanceView({ 
+  students, 
+  attendance, 
+  onMarkAttendance 
+}: { 
+  students: Student[], 
+  attendance: Attendance[],
+  onMarkAttendance: (sId: string, status: Attendance['status']) => void 
+}) {
+  const today = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(today);
+
+  // WhatsApp Link Helper
+  const getWhatsAppLink = (student: Student, status: string) => {
+    const phone = student.parentContact || '923000000000'; // Fallback
+    const message = `Dear Parent, your child ${student.name} is ${status.toUpperCase()} today (${selectedDate}) at Al-Naseeha School.`;
+    return `https://wa.me/${phone.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
+  };
+
+  // Star of the Month calculation
+  const starStudents = useMemo(() => {
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    return students.filter(student => {
+      const monthAttendance = attendance.filter(a => {
+        const d = new Date(a.date);
+        return a.studentId === student.id && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      });
+      
+      // Must have at least one record this month and NO negative records
+      if (monthAttendance.length === 0) return false;
+      return !monthAttendance.some(a => a.status === 'absent' || a.status === 'late' || a.status === 'leave');
+    });
+  }, [students, attendance]);
+
   return (
-    <Card className="border border-border shadow-none rounded-xl overflow-hidden">
-      <CardHeader className="border-b border-border bg-white">
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle className="text-lg font-bold">Daily Attendance</CardTitle>
-            <CardDescription className="text-xs">Mark and track student attendance</CardDescription>
-          </div>
-          <div className="flex gap-4">
-            <Input type="date" className="w-40 h-9 text-xs border-border" defaultValue={new Date().toISOString().split('T')[0]} />
-            <Button className="bg-accent hover:bg-accent/90 text-white h-9 text-xs">Save Changes</Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-background text-muted-foreground font-bold border-b border-border">
-              <tr>
-                <th className="px-6 py-4">Student</th>
-                <th className="px-6 py-4">Roll No</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Remarks</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {students.map((student) => {
-                const att = mockAttendance.find(a => a.studentId === student.id);
-                return (
-                  <tr key={student.id} className="hover:bg-background transition-colors">
-                    <td className="px-6 py-4 font-bold text-foreground">{student.name}</td>
-                    <td className="px-6 py-4 text-muted-foreground">{student.rollNumber}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          variant={att?.status === 'present' ? 'default' : 'outline'}
-                          className={`h-7 w-7 p-0 text-[10px] font-bold ${att?.status === 'present' ? 'bg-emerald-500 hover:bg-emerald-600' : 'border-border'}`}
-                        >P</Button>
-                        <Button 
-                          size="sm" 
-                          variant={att?.status === 'absent' ? 'destructive' : 'outline'}
-                          className={`h-7 w-7 p-0 text-[10px] font-bold ${att?.status === 'absent' ? '' : 'border-border'}`}
-                        >A</Button>
-                        <Button 
-                          size="sm" 
-                          variant={att?.status === 'late' ? 'default' : 'outline'}
-                          className={`h-7 w-7 p-0 text-[10px] font-bold ${att?.status === 'late' ? 'bg-amber-500 hover:bg-amber-600' : 'border-border'}`}
-                        >L</Button>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Input placeholder="Add note..." className="h-7 text-[10px] border-border max-w-[150px]" />
-                    </td>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Attendance Card */}
+        <Card className="lg:col-span-2 border border-border shadow-none rounded-xl overflow-hidden">
+          <CardHeader className="border-b border-border bg-white">
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-lg font-bold">Daily Attendance</CardTitle>
+                <CardDescription className="text-xs">Mark and track student attendance</CardDescription>
+              </div>
+              <div className="flex gap-4">
+                <Input 
+                  type="date" 
+                  value={selectedDate} 
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-40 h-9 text-xs border-border" 
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-background text-muted-foreground font-bold border-b border-border">
+                  <tr>
+                    <th className="px-6 py-4">Student</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Parent Notification</th>
+                    <th className="px-6 py-4">Remarks</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {students.map((student) => {
+                    const att = attendance.find(a => a.studentId === student.id && a.date === selectedDate);
+                    return (
+                      <tr key={student.id} className="hover:bg-background transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-foreground">{student.name}</div>
+                          <div className="text-[10px] text-muted-foreground">Roll: {student.rollNumber}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              variant={att?.status === 'present' ? 'default' : 'outline'}
+                              onClick={() => onMarkAttendance(student.id, 'present')}
+                              className={`h-7 w-7 p-0 text-[10px] font-bold ${att?.status === 'present' ? 'bg-emerald-500 hover:bg-emerald-600' : 'border-border'}`}
+                            >P</Button>
+                            <Button 
+                              size="sm" 
+                              variant={att?.status === 'absent' ? 'destructive' : 'outline'}
+                              onClick={() => onMarkAttendance(student.id, 'absent')}
+                              className={`h-7 w-7 p-0 text-[10px] font-bold ${att?.status === 'absent' ? 'bg-red-500 hover:bg-red-600' : 'border-border'}`}
+                            >A</Button>
+                            <Button 
+                              size="sm" 
+                              variant={att?.status === 'late' ? 'default' : 'outline'}
+                              onClick={() => onMarkAttendance(student.id, 'late')}
+                              className={`h-7 w-7 p-0 text-[10px] font-bold ${att?.status === 'late' ? 'bg-amber-500 hover:bg-amber-600' : 'border-border'}`}
+                            >L</Button>
+                            <Button 
+                              size="sm" 
+                              variant={att?.status === 'leave' ? 'default' : 'outline'}
+                              onClick={() => onMarkAttendance(student.id, 'leave')}
+                              className={`h-7 w-7 p-0 text-[10px] font-bold ${att?.status === 'leave' ? 'bg-blue-500 hover:bg-blue-600' : 'border-border'}`}
+                            >LV</Button>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {(att?.status === 'absent' || att?.status === 'late') ? (
+                            <a 
+                              href={getWhatsAppLink(student, att.status)} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full text-[10px] font-bold hover:bg-emerald-200 transition-colors"
+                            >
+                              <MessageCircle size={12} /> Notify Parent
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground italic text-[10px]">No action required</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <Input placeholder="Add note..." className="h-7 text-[10px] border-border max-w-[120px]" />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Star of the Month Sidebar */}
+        <div className="space-y-6">
+          <Card className="border border-border shadow-none rounded-xl bg-gradient-to-br from-amber-50 to-white overflow-hidden">
+            <CardHeader className="bg-amber-500/10 border-b border-amber-200">
+              <div className="flex items-center gap-2">
+                <Trophy className="text-amber-500" size={20} />
+                <CardTitle className="text-base font-bold text-amber-900">Star of the Month</CardTitle>
+              </div>
+              <CardDescription className="text-xs text-amber-700 font-medium">Perfect attendance for {new Date().toLocaleString('default', { month: 'long' })}</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4">
+              <ScrollArea className="h-[400px] pr-4">
+                {starStudents.length > 0 ? (
+                  <div className="space-y-3">
+                    {starStudents.map(student => (
+                      <div key={student.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-amber-200 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <Avatar className="h-8 w-8 border-2 border-amber-200">
+                              <AvatarFallback className="bg-amber-50 text-amber-700 text-[10px] font-bold">{student.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className="absolute -top-1 -right-1 bg-amber-400 rounded-full h-3 w-3 flex items-center justify-center border border-white">
+                              <Star size={8} className="text-white" fill="currentColor" />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="font-bold text-xs text-amber-900 leading-none">{student.name}</div>
+                            <div className="text-[10px] text-amber-600 mt-1">Grade: {student.grade} - {student.section}</div>
+                          </div>
+                        </div>
+                        <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none text-[9px]">Star</Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center py-12 px-4 italic text-muted-foreground text-xs space-y-2">
+                    <Star className="text-amber-200" size={32} />
+                    <p>No perfect attendance records found for this month yet.</p>
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border shadow-none rounded-xl bg-white">
+            <CardHeader className="border-b border-border pb-3">
+              <CardTitle className="text-sm font-bold">Today's Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100 text-center">
+                  <div className="text-xl font-bold text-emerald-700">
+                    {attendance.filter(a => a.date === selectedDate && a.status === 'present').length}
+                  </div>
+                  <div className="text-[9px] font-bold text-emerald-600 uppercase">Present</div>
+                </div>
+                <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-center">
+                  <div className="text-xl font-bold text-red-700">
+                    {attendance.filter(a => a.date === selectedDate && a.status === 'absent').length}
+                  </div>
+                  <div className="text-[9px] font-bold text-red-600 uppercase">Absent</div>
+                </div>
+                <div className="bg-amber-50 p-3 rounded-lg border border-amber-100 text-center">
+                  <div className="text-xl font-bold text-amber-700">
+                    {attendance.filter(a => a.date === selectedDate && a.status === 'late').length}
+                  </div>
+                  <div className="text-[9px] font-bold text-amber-600 uppercase">Late</div>
+                </div>
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-center">
+                  <div className="text-xl font-bold text-blue-700">
+                    {attendance.filter(a => a.date === selectedDate && a.status === 'leave').length}
+                  </div>
+                  <div className="text-[9px] font-bold text-blue-600 uppercase">Leave</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-function FeesView({ students }: { students: Student[] }) {
-  const totalFees = students.reduce((sum, s) => sum + s.monthlyFee, 0);
+function FeesView({ 
+  students, 
+  feeRecords, 
+  onRecordFee 
+}: { 
+  students: Student[], 
+  feeRecords: FeeRecord[],
+  onRecordFee: (r: FeeRecord) => void
+}) {
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [openRecord, setOpenRecord] = useState(false);
+  const [openLedger, setOpenLedger] = useState(false);
+  const [activeTab, setActiveTab] = useState<'all' | 'pending'>('all');
+  
+  const [feeForm, setFeeForm] = useState({
+    amount: '',
+    month: new Date().toLocaleString('default', { month: 'long' }),
+    year: new Date().getFullYear().toString(),
+  });
+
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const studentLedger = useMemo(() => {
+    if (!selectedStudent) return [];
+    return feeRecords
+      .filter(r => r.studentId === selectedStudent.id)
+      .sort((a, b) => {
+        const dateA = new Date(`${a.month} 1, ${a.year}`);
+        const dateB = new Date(`${b.month} 1, ${b.year}`);
+        return dateB.getTime() - dateA.getTime();
+      });
+  }, [selectedStudent, feeRecords]);
+
+  const pendingStudents = useMemo(() => {
+    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+    const currentYear = new Date().getFullYear();
+    
+    return students.filter(s => {
+      const isPaid = feeRecords.some(r => 
+        r.studentId === s.id && 
+        r.month === currentMonth && 
+        r.year === currentYear && 
+        r.status === 'paid'
+      );
+      return !isPaid;
+    });
+  }, [students, feeRecords]);
+
+  const totalPending = pendingStudents.reduce((sum, s) => sum + s.monthlyFee, 0);
+
+  const handleRecordFee = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudent) return;
+
+    const newRecord: FeeRecord = {
+      id: Math.random().toString(36).substr(2, 9),
+      studentId: selectedStudent.id,
+      amount: Number(feeForm.amount),
+      month: feeForm.month,
+      year: Number(feeForm.year),
+      status: 'paid',
+      paymentDate: new Date().toISOString().split('T')[0],
+    };
+
+    onRecordFee(newRecord);
+    setOpenRecord(false);
+    
+    // Generate WhatsApp Link in Urdu
+    const message = `اسلام علیکم! آپ کے بچے ${selectedStudent.name} کی فیس مبلغ ${feeForm.amount} روپے برائے مہینہ ${feeForm.month} وصول کر لی گئی ہے۔ شکریہ۔`;
+    const waLink = `https://wa.me/${selectedStudent.parentContact.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
+    window.open(waLink, '_blank');
+  };
+
+  const printChallan = (student: Student) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const todayStr = new Date().toLocaleDateString();
+    
+    const challanContent = (title: string) => `
+      <div style="width: 48%; border: 2px solid #000; padding: 15px; box-sizing: border-box; position: relative;">
+        <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
+          <img src="${SCHOOL_LOGO}" style="width: 50px; height: 50px; margin-bottom: 5px;">
+          <h2 style="margin: 0; font-size: 16px; text-transform: uppercase;">Al-Naseeha High School</h2>
+          <p style="margin: 2px 0; font-size: 10px; font-weight: bold; color: #666;">Contact: 0300-1234567 | Session: 2023-24</p>
+          <div style="background: #000; color: #fff; display: inline-block; padding: 2px 10px; font-size: 10px; margin-top: 5px; font-weight: bold;">
+            ${title}
+          </div>
+        </div>
+        
+        <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+          <tr><td style="padding: 4px 0;"><strong>Student Name:</strong></td><td style="border-bottom: 1px dashed #000;">${student.name}</td></tr>
+          <tr><td style="padding: 4px 0;"><strong>Father Name:</strong></td><td style="border-bottom: 1px dashed #000;">${student.parentName}</td></tr>
+          <tr><td style="padding: 4px 0;"><strong>Roll No / Class:</strong></td><td style="border-bottom: 1px dashed #000;">${student.rollNumber} / ${student.grade}</td></tr>
+          <tr><td style="padding: 4px 0;"><strong>Fee Month:</strong></td><td style="border-bottom: 1px dashed #000;">${new Date().toLocaleString('default', { month: 'long' })}</td></tr>
+        </table>
+
+        <table style="width: 100%; margin-top: 15px; font-size: 11px; border: 1px solid #000;">
+          <tr style="background: #f0f0f0;"><th style="border: 1px solid #000; padding: 5px; text-align: left;">Description</th><th style="border: 1px solid #000; padding: 5px; text-align: right;">Amount</th></tr>
+          <tr><td style="border: 1px solid #000; padding: 5px;">Tuition Fee</td><td style="border: 1px solid #000; padding: 5px; text-align: right;">Rs.${student.monthlyFee}</td></tr>
+          <tr><td style="border: 1px solid #000; padding: 5px;">Previous Dues</td><td style="border: 1px solid #000; padding: 5px; text-align: right;">Rs.0</td></tr>
+          <tr><td style="border: 1px solid #000; padding: 5px;">Late Fine</td><td style="border: 1px solid #000; padding: 5px; text-align: right;">Rs.0</td></tr>
+          <tr style="font-weight: bold; font-size: 12px;"><td style="border: 1px solid #000; padding: 5px; background: #f0f0f0;">Total Payable</td><td style="border: 1px solid #000; padding: 5px; text-align: right; background: #f0f0f0;">Rs.${student.monthlyFee}</td></tr>
+        </table>
+
+        <div style="margin-top: 30px; display: flex; justify-content: space-between; font-size: 10px;">
+          <div style="border-top: 1px solid #000; width: 100px; text-align: center; padding-top: 5px;">Bank/Cashier</div>
+          <div style="border-top: 1px solid #000; width: 100px; text-align: center; padding-top: 5px;">Parent/Guardian</div>
+        </div>
+        
+        <p style="font-size: 8px; margin-top: 15px; color: #666; font-style: italic;">* Please pay dues before 10th of every month. Fee is non-refundable.</p>
+        <p style="font-size: 8px; text-align: right; color: #999;">Date: ${todayStr}</p>
+      </div>
+    `;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Fee Challan - ${student.name}</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; }
+            .challan-container { display: flex; justify-content: space-between; width: 100%; border-left: 1px dashed #ccc; border-right: 1px dashed #ccc; }
+            @media print { .challan-container { border: none; } }
+          </style>
+        </head>
+        <body onload="window.print(); window.close();">
+          <div class="challan-container">
+            ${challanContent('School Copy')}
+            <div style="border-left: 1px dashed #ccc; margin: 0 10px;"></div>
+            ${challanContent('Student Copy')}
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const displayList = activeTab === 'all' ? students : pendingStudents;
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="border border-border shadow-none rounded-xl bg-primary text-white">
           <CardContent className="p-6">
-            <p className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-1">Total Fee Demand</p>
-            <h3 className="text-3xl font-bold">${totalFees.toLocaleString()}</h3>
-            <p className="text-emerald-400 text-[11px] font-bold mt-2">Current Monthly Total</p>
+            <p className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-1">Total Monthly Demand</p>
+            <h3 className="text-3xl font-bold">Rs.{students.reduce((sum, s) => sum + s.monthlyFee, 0).toLocaleString()}</h3>
+            <p className="text-emerald-400 text-[11px] font-bold mt-2">Active Student Fees</p>
           </CardContent>
         </Card>
         <Card className="border border-border shadow-none rounded-xl bg-white">
           <CardContent className="p-6">
-            <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider mb-1">Pending Dues</p>
-            <h3 className="text-3xl font-bold text-primary">$8,500</h3>
-            <p className="text-amber-600 text-[11px] font-bold mt-2">14 students remaining</p>
+            <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider mb-1">Pending Amount</p>
+            <h3 className="text-3xl font-bold text-red-600 font-black tracking-tighter">Rs.{totalPending.toLocaleString()}</h3>
+            <p className="text-red-500 text-[11px] font-bold mt-2">{pendingStudents.length} Students Remaining</p>
           </CardContent>
         </Card>
         <Card className="border border-border shadow-none rounded-xl bg-white">
           <CardContent className="p-6">
-            <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider mb-1">Collection Rate</p>
-            <h3 className="text-3xl font-bold text-primary">85%</h3>
-            <p className="text-emerald-600 text-[11px] font-bold mt-2">Target: 95%</p>
+            <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider mb-1">Collection Progress</p>
+            <h3 className="text-3xl font-bold text-primary">
+              {Math.round(((students.length - pendingStudents.length) / students.length) * 100)}%
+            </h3>
+            <p className="text-emerald-600 text-[11px] font-bold mt-2">Target: 100% Monthly</p>
           </CardContent>
         </Card>
       </div>
 
+      <div className="flex bg-muted p-1 rounded-lg w-fit no-print">
+        <Button 
+          variant={activeTab === 'all' ? 'default' : 'ghost'} 
+          onClick={() => setActiveTab('all')}
+          className="text-xs h-8 px-4"
+        >All Students</Button>
+        <Button 
+          variant={activeTab === 'pending' ? 'default' : 'ghost'} 
+          onClick={() => setActiveTab('pending')}
+          className="text-xs h-8 px-4"
+        >Pending Dues ({pendingStudents.length})</Button>
+      </div>
+
       <Card className="border border-border shadow-none rounded-xl overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-white">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-white no-print">
           <div>
-            <CardTitle className="text-lg font-bold">Fee Records</CardTitle>
-            <CardDescription className="text-xs">Track payments for the current academic session</CardDescription>
+            <CardTitle className="text-lg font-bold">Fee Management Portfolio</CardTitle>
+            <CardDescription className="text-xs">
+              {activeTab === 'all' ? 'Viewing all registered students' : 'List of students with pending fees for current month'}
+            </CardDescription>
           </div>
-          <Button variant="outline" className="text-xs h-9 border-border">Export Report</Button>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -1067,32 +1405,60 @@ function FeesView({ students }: { students: Student[] }) {
                 <tr>
                   <th className="px-6 py-4">Student</th>
                   <th className="px-6 py-4">Roll No</th>
-                  <th className="px-6 py-4">Amount</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Date</th>
+                  <th className="px-6 py-4">Monthly Fee</th>
+                  <th className="px-6 py-4">Dues Status</th>
                   <th className="px-6 py-4">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {students.map((student) => {
-                  const fee = mockFees.find(f => f.studentId === student.id);
+                {displayList.map((student) => {
+                  const currentMonthPaid = feeRecords.find(r => 
+                    r.studentId === student.id && 
+                    r.month === new Date().toLocaleString('default', { month: 'long' }) &&
+                    r.year === new Date().getFullYear()
+                  );
+                  
                   return (
                     <tr key={student.id} className="hover:bg-background transition-colors">
-                      <td className="px-6 py-4 font-bold text-foreground">{student.name}</td>
-                      <td className="px-6 py-4 text-muted-foreground">{student.rollNumber}</td>
-                      <td className="px-6 py-4 text-muted-foreground">${student.monthlyFee}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded text-[10px] font-bold ${
-                          fee?.status === 'paid' 
-                            ? 'bg-emerald-100 text-emerald-800' 
-                            : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {fee?.status || 'Pending'}
-                        </span>
+                      <td className="px-6 py-4 font-bold text-foreground">
+                        {student.name}
+                        <div className="text-[10px] text-muted-foreground font-normal">Grade: {student.grade} - {student.section}</div>
                       </td>
-                      <td className="px-6 py-4 text-muted-foreground">{fee?.paymentDate || '-'}</td>
+                      <td className="px-6 py-4 text-muted-foreground">{student.rollNumber}</td>
+                      <td className="px-6 py-4 text-muted-foreground font-bold">Rs.{student.monthlyFee.toLocaleString()}</td>
                       <td className="px-6 py-4">
-                        <Button variant="ghost" size="sm" className="text-accent hover:text-accent/80 text-[11px] h-7">Details</Button>
+                        <Badge className={currentMonthPaid ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100' : 'bg-red-100 text-red-700 hover:bg-red-100'}>
+                          {currentMonthPaid ? 'Paid' : 'Unpaid'}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => {
+                              setSelectedStudent(student);
+                              setFeeForm({ ...feeForm, amount: student.monthlyFee.toString() });
+                              setOpenRecord(true);
+                            }}
+                            className="text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 h-7 text-[10px] font-bold"
+                          >Record Fee</Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => {
+                              setSelectedStudent(student);
+                              setOpenLedger(true);
+                            }}
+                            className="text-primary hover:text-white hover:bg-primary border-primary/20 h-7 text-[10px] font-bold"
+                          >Ledger</Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => printChallan(student)}
+                            className="text-muted-foreground h-7 text-[10px]"
+                          ><Printer size={14} /></Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1102,6 +1468,105 @@ function FeesView({ students }: { students: Student[] }) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Record Fee Dialog */}
+      <Dialog open={openRecord} onOpenChange={setOpenRecord}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Fee Deposit - {selectedStudent?.name}</DialogTitle>
+            <DialogDescription>Enter payment details to update student records.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleRecordFee} className="space-y-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="amount" className="text-right text-xs">Amount</Label>
+              <Input id="amount" type="number" value={feeForm.amount} onChange={(e) => setFeeForm({...feeForm, amount: e.target.value})} className="col-span-3 h-9 text-xs" required />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right text-xs">Month</Label>
+              <Select value={feeForm.month} onValueChange={(v) => setFeeForm({...feeForm, month: v})}>
+                <SelectTrigger className="col-span-3 h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right text-xs">Year</Label>
+              <Input value={feeForm.year} disabled className="col-span-3 h-9 text-xs bg-muted" />
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="submit" className="bg-primary w-full h-10 text-xs font-bold flex items-center gap-2">
+                <MessageCircle size={16} /> Submit & Send WhatsApp Msg
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Student Ledger Dialog */}
+      <Dialog open={openLedger} onOpenChange={setOpenLedger}>
+        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
+          <DialogHeader className="p-6 border-b bg-muted/30">
+            <div className="flex items-center gap-4">
+               <Avatar className="h-12 w-12 border-2 border-primary/20">
+                <AvatarFallback className="bg-primary text-white font-black">{selectedStudent?.name.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div>
+                <DialogTitle className="text-xl font-black">{selectedStudent?.name}'s Ledger</DialogTitle>
+                <DialogDescription className="text-xs">Comprehensive tracking of fee history and payments</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="p-6">
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                <p className="text-[10px] font-bold text-emerald-700 uppercase">Paid Count</p>
+                <p className="text-xl font-black text-emerald-800">{studentLedger.length}</p>
+              </div>
+              <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
+                <p className="text-[10px] font-bold text-primary uppercase">Current Rate</p>
+                <p className="text-xl font-black text-primary">Rs.{selectedStudent?.monthlyFee.toLocaleString()}</p>
+              </div>
+              <div className="p-3 bg-red-50 rounded-xl border border-red-100">
+                <p className="text-[10px] font-bold text-red-700 uppercase">Dues Status</p>
+                <p className="text-xl font-black text-red-800">Clear</p>
+              </div>
+            </div>
+            
+            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Payment History</p>
+            <ScrollArea className="h-[300px] border border-border rounded-xl">
+              <table className="w-full text-[11px] text-left">
+                <thead className="bg-muted/50 font-bold sticky top-0 bg-white">
+                  <tr>
+                    <th className="p-3 border-b border-border">Month/Year</th>
+                    <th className="p-3 border-b border-border">Date Paid</th>
+                    <th className="p-3 border-b border-border text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {studentLedger.length > 0 ? studentLedger.map(record => (
+                    <tr key={record.id}>
+                      <td className="p-3 font-bold">{record.month} {record.year}</td>
+                      <td className="p-3 text-muted-foreground">{record.paymentDate}</td>
+                      <td className="p-3 text-right font-black text-emerald-600">Rs.{record.amount.toLocaleString()}</td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={3} className="p-10 text-center italic text-muted-foreground">No payment history found for this student.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </ScrollArea>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button variant="outline" size="sm" onClick={() => setOpenLedger(false)} className="h-9 text-xs">Close Ledger</Button>
+              <Button size="sm" onClick={() => selectedStudent && printChallan(selectedStudent)} className="h-9 text-xs flex items-center gap-2">
+                <Printer size={14} /> Print Fresh Challan
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
