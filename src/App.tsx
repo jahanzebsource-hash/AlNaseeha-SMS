@@ -23,7 +23,17 @@ import {
   DollarSign,
   MessageCircle,
   Trophy,
-  Star
+  Star,
+  FileText,
+  TrendingDown,
+  TrendingUp,
+  Receipt,
+  MoreHorizontal,
+  Eye,
+  Trash2,
+  Edit,
+  ArrowUpRight,
+  ArrowDownRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -41,16 +51,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Student, Teacher, PayrollRecord, Attendance, FeeRecord, FeeChallan } from './types';
+import { Student, Teacher, PayrollRecord, Attendance, FeeRecord, FeeChallan, FinanceTransaction, TransactionType, IncomeCategory, ExpenseCategory } from './types';
 import { 
   mockStudents, 
   mockTeachers, 
   mockAnnouncements, 
   mockAttendance, 
-  mockFees 
+  mockFees,
+  mockTransactions
 } from './lib/mockData';
 
-type View = 'dashboard' | 'students' | 'teachers' | 'attendance' | 'fees' | 'exams' | 'announcements';
+type View = 'dashboard' | 'students' | 'teachers' | 'attendance' | 'fees' | 'exams' | 'announcements' | 'finance';
 
 const SCHOOL_CLASSES = [
   'Play Group', 'Nursery', 'KG', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'
@@ -67,6 +78,7 @@ export default function App() {
   const [attendance, setAttendance] = useState<Attendance[]>(mockAttendance as Attendance[]);
   const [feeRecords, setFeeRecords] = useState<FeeRecord[]>(mockFees as FeeRecord[]);
   const [feeChallans, setFeeChallans] = useState<FeeChallan[]>([]);
+  const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
 
   const totalMonthlyFee = useMemo(() => {
     return students.reduce((sum, student) => sum + student.monthlyFee, 0);
@@ -78,6 +90,7 @@ export default function App() {
     { id: 'teachers', label: 'Staff & Teachers', icon: UserSquare2 },
     { id: 'attendance', label: 'Attendance System', icon: CalendarCheck },
     { id: 'fees', label: 'Fee & Financials', icon: CreditCard },
+    { id: 'finance', label: 'Income & Expense', icon: Receipt },
     { id: 'exams', label: 'Examinations', icon: GraduationCap },
     { id: 'announcements', label: 'Announcements', icon: Bell },
   ];
@@ -129,6 +142,16 @@ export default function App() {
             onRecordFee={(record) => setFeeRecords(prev => [...prev, record])}
             onSaveChallans={(newChallans) => setFeeChallans(prev => [...prev, ...newChallans])}
             onDeleteChallan={(id) => setFeeChallans(prev => prev.filter(c => c.id !== id))}
+            onUpdateChallan={(challan) => setFeeChallans(prev => prev.map(c => c.id === challan.id ? challan : c))}
+          />
+        );
+      case 'finance':
+        return (
+          <FinanceView 
+            students={students} 
+            transactions={transactions}
+            onAddTransaction={(t) => setTransactions(prev => [...prev, t])}
+            onDeleteTransaction={(id) => setTransactions(prev => prev.filter(tr => tr.id !== id))}
           />
         );
       case 'exams':
@@ -1271,19 +1294,25 @@ function FeesView({
   feeChallans, 
   onRecordFee,
   onSaveChallans,
-  onDeleteChallan
+  onDeleteChallan,
+  onUpdateChallan
 }: { 
   students: Student[], 
   feeRecords: FeeRecord[], 
   feeChallans: FeeChallan[],
   onRecordFee: (r: FeeRecord) => void,
   onSaveChallans: (c: FeeChallan[]) => void,
-  onDeleteChallan: (id: string) => void
+  onDeleteChallan: (id: string) => void,
+  onUpdateChallan: (as: FeeChallan) => void
 }) {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedChallan, setSelectedChallan] = useState<FeeChallan | null>(null);
   const [openRecord, setOpenRecord] = useState(false);
   const [openLedger, setOpenLedger] = useState(false);
+  const [openChallanDetail, setOpenChallanDetail] = useState(false);
+  const [openChallanEdit, setOpenChallanEdit] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'challans'>('all');
+  const [challanSearch, setChallanSearch] = useState('');
   
   const [feeForm, setFeeForm] = useState({
     amount: '',
@@ -1484,6 +1513,17 @@ function FeesView({
     printWindow.document.close();
   };
 
+  const filteredChallans = useMemo(() => {
+    return feeChallans.filter(c => {
+      const student = students.find(s => s.id === c.studentId);
+      const searchLower = challanSearch.toLowerCase();
+      return (
+        student?.name.toLowerCase().includes(searchLower) ||
+        c.id.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [feeChallans, students, challanSearch]);
+
   const displayList = activeTab === 'all' ? students : pendingStudents;
 
   return (
@@ -1653,9 +1693,18 @@ function FeesView({
       ) : (
         <Card className="border border-border shadow-none rounded-xl overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-white">
-            <div>
+            <div className="flex-1">
               <CardTitle className="text-lg font-bold underline decoration-accent">Generated Challans Repo</CardTitle>
               <CardDescription className="text-xs italic">Manage issued challans for individual/bulk printing</CardDescription>
+            </div>
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search student or ID..." 
+                className="pl-9 h-9 text-xs"
+                value={challanSearch}
+                onChange={(e) => setChallanSearch(e.target.value)}
+              />
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -1668,11 +1717,11 @@ function FeesView({
                     <th className="px-6 py-4">Period</th>
                     <th className="px-6 py-4">Total Amount</th>
                     <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4">Actions</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {feeChallans.length > 0 ? feeChallans.map((challan) => {
+                  {filteredChallans.length > 0 ? filteredChallans.map((challan) => {
                     const student = students.find(s => s.id === challan.studentId);
                     return (
                       <tr key={challan.id} className="hover:bg-background transition-colors">
@@ -1683,18 +1732,52 @@ function FeesView({
                         </td>
                         <td className="px-6 py-4 text-muted-foreground">{challan.month} {challan.year}</td>
                         <td className="px-6 py-4 font-black">Rs.{challan.totalPayable.toLocaleString()}</td>
-                        <td className="px-6 py-4"><Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] uppercase font-bold">{challan.status}</Badge></td>
                         <td className="px-6 py-4">
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => printChallan(challan)} className="h-7 text-[10px] font-bold border-primary/20 text-primary hover:bg-primary hover:text-white"><Printer size={12} className="mr-1" /> Print</Button>
-                            <Button variant="outline" size="sm" onClick={() => onDeleteChallan(challan.id)} className="h-7 text-[10px] font-bold border-red-200 text-red-600 hover:bg-red-600 hover:text-white">Delete</Button>
+                          <Badge variant="outline" className={`${
+                            challan.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            challan.status === 'cancelled' ? 'bg-red-50 text-red-700 border-red-200' :
+                            'bg-blue-50 text-blue-700 border-blue-200'
+                          } text-[10px] uppercase font-bold`}>
+                            {challan.status}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex justify-end gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7 text-primary" 
+                              onClick={() => {
+                                setSelectedChallan(challan);
+                                setOpenChallanDetail(true);
+                              }}
+                            >
+                              <Eye size={14} />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7 text-amber-600"
+                              onClick={() => {
+                                setSelectedChallan(challan);
+                                setOpenChallanEdit(true);
+                              }}
+                            >
+                              <Edit size={14} />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-indigo-600" onClick={() => printChallan(challan)}>
+                              <Printer size={14} />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600" onClick={() => onDeleteChallan(challan.id)}>
+                              <Trash2 size={14} />
+                            </Button>
                           </div>
                         </td>
                       </tr>
                     );
                   }) : (
                     <tr>
-                      <td colSpan={6} className="p-10 text-center italic text-muted-foreground">No challans generated yet.</td>
+                      <td colSpan={6} className="p-10 text-center italic text-muted-foreground">No challans found.</td>
                     </tr>
                   )}
                 </tbody>
@@ -1703,6 +1786,108 @@ function FeesView({
           </CardContent>
         </Card>
       )}
+
+      {/* Challan Detail Dialog */}
+      <Dialog open={openChallanDetail} onOpenChange={setOpenChallanDetail}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-accent" />
+              Challan Detail - {selectedChallan?.id}
+            </DialogTitle>
+            <DialogDescription>Full breakdown of generated fee challan</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Student</p>
+                <p className="text-sm font-bold">{students.find(s => s.id === selectedChallan?.studentId)?.name}</p>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Period</p>
+                <p className="text-sm font-bold">{selectedChallan?.month} {selectedChallan?.year}</p>
+              </div>
+            </div>
+            <div className="border border-border rounded-xl overflow-hidden text-xs">
+              <div className="flex justify-between p-3 border-b bg-muted/30">
+                <span className="font-bold">Description</span>
+                <span className="font-bold">Amount</span>
+              </div>
+              <div className="p-3 space-y-2">
+                <div className="flex justify-between italic">
+                  <span>Tuition Fee</span>
+                  <span>Rs.{selectedChallan?.monthlyFee.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between italic">
+                  <span>Previous Arrears</span>
+                  <span>Rs.{selectedChallan?.arrears.toLocaleString()}</span>
+                </div>
+                {selectedChallan?.arrearsDescription && (
+                  <p className="text-[10px] text-muted-foreground pl-2 italic">({selectedChallan.arrearsDescription})</p>
+                )}
+              </div>
+              <div className="flex justify-between p-3 bg-accent/10 border-t border-accent/20 font-bold text-sm">
+                <span>Total Payable</span>
+                <span className="text-accent font-black">Rs.{selectedChallan?.totalPayable.toLocaleString()}</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-[11px] text-muted-foreground">
+              <p>Issue Date: {selectedChallan?.issueDate}</p>
+              <p className="text-right">Due Date: {selectedChallan?.dueDate}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenChallanDetail(false)} className="h-9 text-xs">Close</Button>
+            <Button onClick={() => selectedChallan && printChallan(selectedChallan)} className="h-9 text-xs bg-primary">
+              <Printer size={14} className="mr-2" /> Print Now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Challan Edit Dialog */}
+      <Dialog open={openChallanEdit} onOpenChange={setOpenChallanEdit}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Edit Challan - {selectedChallan?.id}</DialogTitle>
+            <DialogDescription>Modify amount or status for this specific challan</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Payable Amount (PKR)</Label>
+              <Input 
+                type="number" 
+                value={selectedChallan?.totalPayable} 
+                onChange={(e) => setSelectedChallan(prev => prev ? { ...prev, totalPayable: Number(e.target.value) } : null)}
+                className="h-9 text-xs"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Challan Status</Label>
+              <Select 
+                value={selectedChallan?.status} 
+                onValueChange={(v: any) => setSelectedChallan(prev => prev ? { ...prev, status: v } : null)}
+              >
+                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="issued">Issued</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenChallanEdit(false)} className="h-9 text-xs text-red-600 hover:bg-red-50 border-red-100">Cancel</Button>
+            <Button onClick={() => {
+              if (selectedChallan) {
+                onUpdateChallan(selectedChallan);
+                setOpenChallanEdit(false);
+              }
+            }} className="h-9 text-xs bg-accent">Update Challan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Record Fee Dialog */}
       <Dialog open={openRecord} onOpenChange={setOpenRecord}>
@@ -1896,6 +2081,399 @@ function ExamsView({ students }: { students: Student[] }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function FinanceView({ 
+  students, 
+  transactions, 
+  onAddTransaction,
+  onDeleteTransaction
+}: { 
+  students: Student[], 
+  transactions: FinanceTransaction[],
+  onAddTransaction: (t: FinanceTransaction) => void,
+  onDeleteTransaction: (id: string) => void
+}) {
+  const [activeTab, setActiveTab] = useState<'transactions' | 'balancesheet'>('transactions');
+  const [openAdd, setOpenAdd] = useState(false);
+  const [formData, setFormData] = useState({
+    type: 'income' as TransactionType,
+    category: 'Admission' as IncomeCategory | ExpenseCategory,
+    amount: '',
+    description: '',
+    studentId: '',
+    date: new Date().toISOString().split('T')[0]
+  });
+
+  const incomeCategories: IncomeCategory[] = ['Admission', 'Yearly Charges', 'Tuition Fee', 'Rent', 'Stationery Sale', 'Others'];
+  const expenseCategories: ExpenseCategory[] = ['Salaries', 'Utilities', 'Maintenance', 'Rent', 'Supplies', 'Marketing', 'Others'];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newTransaction: FinanceTransaction = {
+      id: Math.random().toString(36).substr(2, 9),
+      type: formData.type,
+      category: formData.category,
+      amount: Number(formData.amount),
+      date: formData.date,
+      description: formData.description,
+      studentId: formData.studentId || undefined,
+      month: new Date(formData.date).toLocaleString('default', { month: 'long' }),
+      year: new Date(formData.date).getFullYear()
+    };
+    onAddTransaction(newTransaction);
+    setOpenAdd(false);
+    setFormData({
+      type: 'income',
+      category: 'Admission',
+      amount: '',
+      description: '',
+      studentId: '',
+      date: new Date().toISOString().split('T')[0]
+    });
+  };
+
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+  const netProfit = totalIncome - totalExpense;
+
+  const getBreakout = () => {
+    const breakout: { [key: string]: number } = {};
+    transactions.forEach(t => {
+      const key = `${t.type}:${t.category}`;
+      breakout[key] = (breakout[key] || 0) + t.amount;
+    });
+    return breakout;
+  };
+
+  const printBalanceSheet = () => {
+    const breakout = getBreakout();
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Balance Sheet - ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #333; }
+            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px; }
+            .stat-box { padding: 15px; border: 1px solid #ddd; border-radius: 8px; text-align: center; }
+            .income { color: #10b981; }
+            .expense { color: #ef4444; }
+            .table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+            .table th, .table td { border: 1px solid #eee; padding: 12px; text-align: left; }
+            .table th { background: #f9fafb; font-weight: bold; }
+            .profit { color: #10b981; font-weight: bold; }
+            .loss { color: #ef4444; font-weight: bold; }
+          </style>
+        </head>
+        <body onload="window.print();">
+          <div class="header">
+            <h1 style="margin:0;">Al-Naseeha High School</h1>
+            <p style="margin:5px 0; color:#666;">Monthly Financial Balance Sheet</p>
+            <p style="font-weight:bold;">${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
+          </div>
+          
+          <div class="summary">
+            <div class="stat-box">
+              <p style="font-size:12px; margin:0; text-transform:uppercase; color:#666;">Total Income</p>
+              <h2 class="income">Rs.${totalIncome.toLocaleString()}</h2>
+            </div>
+            <div class="stat-box">
+              <p style="font-size:12px; margin:0; text-transform:uppercase; color:#666;">Total Expense</p>
+              <h2 class="expense">Rs.${totalExpense.toLocaleString()}</h2>
+            </div>
+            <div class="stat-box">
+              <p style="font-size:12px; margin:0; text-transform:uppercase; color:#666;">Net ${netProfit >= 0 ? 'Profit' : 'Loss'}</p>
+              <h2 class="${netProfit >= 0 ? 'profit' : 'loss'}">Rs.${Math.abs(netProfit).toLocaleString()}</h2>
+            </div>
+          </div>
+
+          <h3>Income Breakdown</h3>
+          <table class="table">
+            <thead><tr><th>Category</th><th>Amount</th></tr></thead>
+            <tbody>
+              ${incomeCategories.map(cat => `
+                <tr>
+                  <td>${cat}</td>
+                  <td>Rs.${(breakout[`income:${cat}`] || 0).toLocaleString()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <h3>Expense Breakdown</h3>
+          <table class="table">
+            <thead><tr><th>Category</th><th>Amount</th></tr></thead>
+            <tbody>
+              ${expenseCategories.map(cat => `
+                <tr>
+                  <td>${cat}</td>
+                  <td>Rs.${(breakout[`expense:${cat}`] || 0).toLocaleString()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="bg-emerald-600 text-white border-none shadow-lg">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div className="bg-white/20 p-2 rounded-lg"><TrendingUp size={20} /></div>
+              <ArrowUpRight size={20} className="text-white/60" />
+            </div>
+            <p className="text-white/70 text-xs font-bold uppercase tracking-wider">Total Income</p>
+            <h3 className="text-2xl font-black">Rs.{totalIncome.toLocaleString()}</h3>
+          </CardContent>
+        </Card>
+        <Card className="bg-rose-600 text-white border-none shadow-lg">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div className="bg-white/20 p-2 rounded-lg"><TrendingDown size={20} /></div>
+              <ArrowDownRight size={20} className="text-white/60" />
+            </div>
+            <p className="text-white/70 text-xs font-bold uppercase tracking-wider">Total Expense</p>
+            <h3 className="text-2xl font-black">Rs.{totalExpense.toLocaleString()}</h3>
+          </CardContent>
+        </Card>
+        <Card className={`border-none shadow-lg text-white ${netProfit >= 0 ? 'bg-primary' : 'bg-red-700'}`}>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div className="bg-white/20 p-2 rounded-lg font-black">{netProfit >= 0 ? 'PROFIT' : 'LOSS'}</div>
+              <DollarSign size={20} className="text-white/60" />
+            </div>
+            <p className="text-white/70 text-xs font-bold uppercase tracking-wider">Net Balance</p>
+            <h3 className="text-2xl font-black">Rs.{Math.abs(netProfit).toLocaleString()}</h3>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex bg-muted p-1 rounded-lg w-fit">
+        <Button 
+          variant={activeTab === 'transactions' ? 'default' : 'ghost'} 
+          onClick={() => setActiveTab('transactions')}
+          className="text-xs h-8 px-4"
+        >Transactions</Button>
+        <Button 
+          variant={activeTab === 'balancesheet' ? 'default' : 'ghost'} 
+          onClick={() => setActiveTab('balancesheet')}
+          className="text-xs h-8 px-4"
+        >Balance Sheet</Button>
+      </div>
+
+      {activeTab === 'transactions' ? (
+        <Card className="border border-border shadow-none rounded-xl overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-white">
+            <div>
+              <CardTitle className="text-lg font-black">Financial Transactions</CardTitle>
+              <CardDescription className="text-xs">Record and track all cash flows</CardDescription>
+            </div>
+            <Button onClick={() => setOpenAdd(true)} className="bg-primary hover:bg-primary/90 text-white h-9 text-xs">
+              <Plus size={16} className="mr-2" /> Add Transaction
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-background text-muted-foreground font-bold border-b border-border">
+                  <tr>
+                    <th className="px-6 py-4">Date</th>
+                    <th className="px-6 py-4">Type</th>
+                    <th className="px-6 py-4">Category</th>
+                    <th className="px-6 py-4">Description</th>
+                    <th className="px-6 py-4">Amount</th>
+                    <th className="px-6 py-4">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {transactions.length > 0 ? [...transactions].reverse().map((t) => (
+                    <tr key={t.id} className="hover:bg-background transition-colors">
+                      <td className="px-6 py-4 text-muted-foreground">{t.date}</td>
+                      <td className="px-6 py-4">
+                        <Badge className={`${t.type === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'} border-none uppercase text-[9px] font-black tracking-tighter`}>
+                          {t.type}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 font-bold">{t.category}</td>
+                      <td className="px-6 py-4">
+                        {t.description}
+                        {t.studentId && (
+                          <div className="text-[10px] text-muted-foreground italic">Student: {students.find(s => s.id === t.studentId)?.name}</div>
+                        )}
+                      </td>
+                      <td className={`px-6 py-4 font-black ${t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {t.type === 'income' ? '+' : '-'}Rs.{t.amount.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        <Button variant="ghost" size="sm" onClick={() => onDeleteTransaction(t.id)} className="text-red-500 hover:text-red-700 h-7 w-7 p-0">
+                          <Trash2 size={14} />
+                        </Button>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={6} className="p-10 text-center italic text-muted-foreground">No transactions recorded yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border border-border shadow-none rounded-xl overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-white">
+            <div>
+              <CardTitle className="text-lg font-black">Monthly Balance Sheet</CardTitle>
+              <CardDescription className="text-xs">Consolidated financial report</CardDescription>
+            </div>
+            <Button onClick={printBalanceSheet} variant="outline" className="h-9 text-xs border-primary text-primary font-bold">
+              <Printer size={16} className="mr-2" /> Print Balance Sheet
+            </Button>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <h4 className="text-sm font-black text-emerald-700 border-b-2 border-emerald-100 pb-2">INCOME BREAKOUT</h4>
+                <div className="space-y-2">
+                  {incomeCategories.map(cat => {
+                    const amount = transactions.filter(t => t.type === 'income' && t.category === cat).reduce((sum, t) => sum + t.amount, 0);
+                    return (
+                      <div key={cat} className="flex justify-between items-center text-xs p-2 bg-emerald-50/50 rounded-lg">
+                        <span className="font-bold">{cat}</span>
+                        <span className="font-black text-emerald-600">Rs.{amount.toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h4 className="text-sm font-black text-rose-700 border-b-2 border-rose-100 pb-2">EXPENSE BREAKOUT</h4>
+                <div className="space-y-2">
+                  {expenseCategories.map(cat => {
+                    const amount = transactions.filter(t => t.type === 'expense' && t.category === cat).reduce((sum, t) => sum + t.amount, 0);
+                    return (
+                      <div key={cat} className="flex justify-between items-center text-xs p-2 bg-rose-50/50 rounded-lg">
+                        <span className="font-bold">{cat}</span>
+                        <span className="font-black text-rose-600">Rs.{amount.toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Add Transaction Dialog */}
+      <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black">Record Transaction</DialogTitle>
+            <DialogDescription>Add a new income or expense entry</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs">Type</Label>
+                <Select 
+                  value={formData.type} 
+                  onValueChange={(v: TransactionType) => setFormData({
+                    ...formData, 
+                    type: v, 
+                    category: v === 'income' ? incomeCategories[0] : expenseCategories[0]
+                  })}
+                >
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="income">Income (+)</SelectItem>
+                    <SelectItem value="expense">Expense (-)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Category</Label>
+                <Select 
+                  value={formData.category} 
+                  onValueChange={(v: any) => setFormData({...formData, category: v})}
+                >
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {formData.type === 'income' ? (
+                      incomeCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)
+                    ) : (
+                      expenseCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {(formData.category === 'Admission' || formData.category === 'Yearly Charges' || formData.category === 'Tuition Fee') && (
+              <div className="space-y-2">
+                <Label className="text-xs">Select Student</Label>
+                <Select value={formData.studentId} onValueChange={(v) => setFormData({...formData, studentId: v})}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select a student..." /></SelectTrigger>
+                  <SelectContent>
+                    {students.map(s => <SelectItem key={s.id} value={s.id}>{s.name} ({s.rollNumber})</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs">Amount (PKR)</Label>
+                <Input 
+                  type="number" 
+                  value={formData.amount} 
+                  onChange={(e) => setFormData({...formData, amount: e.target.value})} 
+                  className="h-9 text-xs" 
+                  required 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Date</Label>
+                <Input 
+                  type="date" 
+                  value={formData.date} 
+                  onChange={(e) => setFormData({...formData, date: e.target.value})} 
+                  className="h-9 text-xs" 
+                  required 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Description</Label>
+              <Input 
+                value={formData.description} 
+                onChange={(e) => setFormData({...formData, description: e.target.value})} 
+                placeholder="e.g. Admission fee for new intake..."
+                className="h-9 text-xs" 
+                required 
+              />
+            </div>
+
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setOpenAdd(false)} className="h-10 text-xs">Cancel</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90 h-10 text-xs font-black">Save Transaction</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 

@@ -97,3 +97,20 @@ export interface FeeChallan {
   dueDate: string;
   status: 'issued' | 'paid' | 'cancelled';
 }
+
+export type TransactionType = 'income' | 'expense';
+
+export type IncomeCategory = 'Admission' | 'Yearly Charges' | 'Tuition Fee' | 'Rent' | 'Stationery Sale' | 'Others';
+export type ExpenseCategory = 'Salaries' | 'Utilities' | 'Maintenance' | 'Rent' | 'Supplies' | 'Marketing' | 'Others';
+
+export interface FinanceTransaction {
+  id: string;
+  type: TransactionType;
+  category: IncomeCategory | ExpenseCategory;
+  amount: number;
+  date: string;
+  description: string;
+  studentId?: string; // For Admission, Yearly Charges, Tuition Fee
+  month: string;
+  year: number;
+}

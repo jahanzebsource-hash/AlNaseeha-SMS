@@ -1,4 +1,4 @@
-import { Student, Teacher, Attendance, FeeRecord, ExamResult, Announcement } from '../types';
+import { Student, Teacher, Attendance, FeeRecord, ExamResult, Announcement, FinanceTransaction } from '../types';
 
 export const mockStudents: Student[] = [
   {
@@ -77,3 +77,5 @@ export const mockFees: FeeRecord[] = [
   { id: 'f1', studentId: 's1', amount: 5000, month: 'May', year: 2024, status: 'paid', paymentDate: '2024-05-05' },
   { id: 'f2', studentId: 's2', amount: 5000, month: 'May', year: 2024, status: 'pending' }
 ];
+
+export const mockTransactions: FinanceTransaction[] = [];
