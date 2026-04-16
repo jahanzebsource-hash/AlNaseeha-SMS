@@ -19,6 +19,8 @@ export interface Student extends UserProfile {
   address: string;
   dateOfBirth: string;
   monthlyFee: number;
+  arrears?: number;
+  arrearsDescription?: string;
 }
 
 export interface Teacher extends UserProfile {
@@ -80,4 +82,18 @@ export interface Announcement {
   date: string;
   authorId: string;
   targetRole: UserRole | 'all';
+}
+
+export interface FeeChallan {
+  id: string;
+  studentId: string;
+  month: string;
+  year: number;
+  monthlyFee: number;
+  arrears: number;
+  arrearsDescription?: string;
+  totalPayable: number;
+  issueDate: string;
+  dueDate: string;
+  status: 'issued' | 'paid' | 'cancelled';
 }

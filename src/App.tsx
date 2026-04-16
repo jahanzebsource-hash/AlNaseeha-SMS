@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Student, Teacher, PayrollRecord, Attendance, FeeRecord } from './types';
+import { Student, Teacher, PayrollRecord, Attendance, FeeRecord, FeeChallan } from './types';
 import { 
   mockStudents, 
   mockTeachers, 
@@ -66,6 +66,7 @@ export default function App() {
   const [payroll, setPayroll] = useState<PayrollRecord[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>(mockAttendance as Attendance[]);
   const [feeRecords, setFeeRecords] = useState<FeeRecord[]>(mockFees as FeeRecord[]);
+  const [feeChallans, setFeeChallans] = useState<FeeChallan[]>([]);
 
   const totalMonthlyFee = useMemo(() => {
     return students.reduce((sum, student) => sum + student.monthlyFee, 0);
@@ -124,7 +125,10 @@ export default function App() {
           <FeesView 
             students={students} 
             feeRecords={feeRecords} 
+            feeChallans={feeChallans}
             onRecordFee={(record) => setFeeRecords(prev => [...prev, record])}
+            onSaveChallans={(newChallans) => setFeeChallans(prev => [...prev, ...newChallans])}
+            onDeleteChallan={(id) => setFeeChallans(prev => prev.filter(c => c.id !== id))}
           />
         );
       case 'exams':
@@ -151,9 +155,19 @@ export default function App() {
               animate={{ opacity: 1 }}
               className="flex items-center gap-3"
             >
-              <div className="w-8 h-8 bg-accent rounded-md shrink-0" />
-              <h1 className="text-lg font-extrabold tracking-tight text-white">
-                Al-Naseeha High
+              <div className="w-10 h-10 bg-white rounded-lg shrink-0 flex items-center justify-center p-1 border border-sidebar-border overflow-hidden">
+                <img 
+                  src={SCHOOL_LOGO} 
+                  alt="Logo" 
+                  className="w-full h-full object-contain" 
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://cdn-icons-png.flaticon.com/512/2913/2913008.png';
+                  }}
+                />
+              </div>
+              <h1 className="text-sm font-extrabold tracking-tight text-white leading-tight">
+                Al-Naseeha<br/>High School
               </h1>
             </motion.div>
           )}
@@ -287,7 +301,7 @@ function DashboardView({ totalMonthlyFee, recentStudents }: { totalMonthlyFee: n
                       <td className="px-6 py-3 font-medium text-foreground">{row.name}</td>
                       <td className="px-6 py-3 text-muted-foreground">#{row.rollNumber}</td>
                       <td className="px-6 py-3 text-muted-foreground">{row.grade}</td>
-                      <td className="px-6 py-3 text-muted-foreground">${row.monthlyFee}</td>
+                      <td className="px-6 py-3 text-muted-foreground">Rs.{row.monthlyFee.toLocaleString()}</td>
                       <td className="px-6 py-3">
                         <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">Active</span>
                       </td>
@@ -351,6 +365,7 @@ import { Label } from '@/components/ui/label';
 
 function StudentsView({ students, onAddStudent }: { students: Student[], onAddStudent: (s: Student) => void }) {
   const [open, setOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [filterClass, setFilterClass] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -378,12 +393,39 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
     grade: '',
     section: '',
     rollNumber: '',
+    arrears: '',
+    arrearsDescription: '',
   });
+
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      setEditingStudent(null);
+      setFormData({ name: '', parentName: '', parentContact: '', dateOfBirth: '', monthlyFee: '', grade: '', section: '', rollNumber: '', arrears: '', arrearsDescription: '' });
+    }
+  };
+
+  const handleEdit = (student: Student) => {
+    setEditingStudent(student);
+    setFormData({
+      name: student.name,
+      parentName: student.parentName,
+      parentContact: student.parentContact,
+      dateOfBirth: student.dateOfBirth,
+      monthlyFee: student.monthlyFee.toString(),
+      grade: student.grade,
+      section: student.section,
+      rollNumber: student.rollNumber,
+      arrears: (student.arrears || 0).toString(),
+      arrearsDescription: student.arrearsDescription || '',
+    });
+    setOpen(true);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newStudent: Student = {
-      id: Math.random().toString(36).substr(2, 9),
+    const updatedStudent: Student = {
+      id: editingStudent ? editingStudent.id : Math.random().toString(36).substr(2, 9),
       email: `${formData.name.toLowerCase().replace(/\s/g, '')}@school.com`,
       role: 'student',
       name: formData.name,
@@ -394,12 +436,13 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
       grade: formData.grade,
       section: formData.section,
       rollNumber: formData.rollNumber,
-      address: '',
-      createdAt: new Date().toISOString(),
+      arrears: Number(formData.arrears) || 0,
+      arrearsDescription: formData.arrearsDescription,
+      address: editingStudent?.address || '',
+      createdAt: editingStudent?.createdAt || new Date().toISOString(),
     };
-    onAddStudent(newStudent);
-    setOpen(false);
-    setFormData({ name: '', parentName: '', parentContact: '', dateOfBirth: '', monthlyFee: '', grade: '', section: '', rollNumber: '' });
+    onAddStudent(updatedStudent);
+    handleOpenChange(false);
   };
 
   return (
@@ -440,17 +483,17 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
             </CardDescription>
           </div>
           
-          <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={
+          <Dialog open={open} onOpenChange={handleOpenChange}>
+          <DialogTrigger asChild>
             <Button className="bg-accent hover:bg-accent/90 text-white h-9 text-xs">
               <Plus size={16} className="mr-2" /> Admission Form
             </Button>
-          } />
+          </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>New Student Admission</DialogTitle>
+              <DialogTitle>{editingStudent ? 'Edit Student Details' : 'New Student Admission'}</DialogTitle>
               <DialogDescription>
-                Enter the details for the new student enrollment.
+                {editingStudent ? 'Update info for existing student.' : 'Enter the details for the new student enrollment.'}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="grid gap-4 py-4">
@@ -477,6 +520,14 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="roll" className="text-right text-xs">Roll No</Label>
                 <Input id="roll" value={formData.rollNumber} onChange={(e) => setFormData({...formData, rollNumber: e.target.value})} className="col-span-3 h-8 text-xs" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="arrears" className="text-right text-xs">Arrears (PKR)</Label>
+                <Input id="arrears" type="number" value={formData.arrears} onChange={(e) => setFormData({...formData, arrears: e.target.value})} className="col-span-3 h-8 text-xs" placeholder="Previous pending fee" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="arrearsDesc" className="text-right text-xs">Arrears Desc</Label>
+                <Input id="arrearsDesc" value={formData.arrearsDescription} onChange={(e) => setFormData({...formData, arrearsDescription: e.target.value})} className="col-span-3 h-8 text-xs" placeholder="Reason for arrears" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid grid-cols-2 items-center gap-2">
@@ -537,7 +588,12 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
                   <td className="px-6 py-4 text-muted-foreground">{student.parentName}</td>
                   <td className="px-6 py-4 text-muted-foreground font-bold">Rs.{student.monthlyFee}</td>
                   <td className="px-6 py-4 no-print">
-                    <Button variant="ghost" size="sm" className="text-accent hover:text-accent/80 hover:bg-accent/10 text-[11px] h-7">Edit</Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleEdit(student)}
+                      className="text-accent hover:text-accent/80 hover:bg-accent/10 text-[11px] h-7"
+                    >Edit</Button>
                   </td>
                 </tr>
               ))}
@@ -1212,16 +1268,22 @@ function AttendanceView({
 function FeesView({ 
   students, 
   feeRecords, 
-  onRecordFee 
+  feeChallans, 
+  onRecordFee,
+  onSaveChallans,
+  onDeleteChallan
 }: { 
   students: Student[], 
-  feeRecords: FeeRecord[],
-  onRecordFee: (r: FeeRecord) => void
+  feeRecords: FeeRecord[], 
+  feeChallans: FeeChallan[],
+  onRecordFee: (r: FeeRecord) => void,
+  onSaveChallans: (c: FeeChallan[]) => void,
+  onDeleteChallan: (id: string) => void
 }) {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [openRecord, setOpenRecord] = useState(false);
   const [openLedger, setOpenLedger] = useState(false);
-  const [activeTab, setActiveTab] = useState<'all' | 'pending'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'challans'>('all');
   
   const [feeForm, setFeeForm] = useState({
     amount: '',
@@ -1282,64 +1344,140 @@ function FeesView({
     window.open(waLink, '_blank');
   };
 
-  const printChallan = (student: Student) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+  const generateBulkChallansAction = () => {
+    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+    const currentYear = new Date().getFullYear();
+    const issueDate = new Date().toISOString().split('T')[0];
+    const dueDate = new Date(new Date().getFullYear(), new Date().getMonth(), 10).toISOString().split('T')[0];
 
-    const todayStr = new Date().toLocaleDateString();
-    
-    const challanContent = (title: string) => `
-      <div style="width: 48%; border: 2px solid #000; padding: 15px; box-sizing: border-box; position: relative;">
+    const newChallans: FeeChallan[] = students.map(s => {
+      const total = s.monthlyFee + (s.arrears || 0);
+      return {
+        id: `CH-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+        studentId: s.id,
+        month: currentMonth,
+        year: currentYear,
+        monthlyFee: s.monthlyFee,
+        arrears: s.arrears || 0,
+        arrearsDescription: s.arrearsDescription,
+        totalPayable: total,
+        issueDate,
+        dueDate,
+        status: 'issued'
+      };
+    });
+
+    onSaveChallans(newChallans);
+    setActiveTab('challans');
+  };
+
+  const generateChallanHtmlMarkup = (challan: Partial<FeeChallan> & { studentName: string; grade: string; rollNumber: string }, title: string) => {
+    return `
+      <div style="width: 48%; border: 2px solid #000; padding: 15px; box-sizing: border-box; position: relative; background: #fff;">
         <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
-          <img src="${SCHOOL_LOGO}" style="width: 50px; height: 50px; margin-bottom: 5px;">
-          <h2 style="margin: 0; font-size: 16px; text-transform: uppercase;">Al-Naseeha High School</h2>
-          <p style="margin: 2px 0; font-size: 10px; font-weight: bold; color: #666;">Contact: 0300-1234567 | Session: 2023-24</p>
-          <div style="background: #000; color: #fff; display: inline-block; padding: 2px 10px; font-size: 10px; margin-top: 5px; font-weight: bold;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <img src="${SCHOOL_LOGO}" style="width: 50px; height: 50px;" referrerpolicy="no-referrer" onerror="this.src='https://cdn-icons-png.flaticon.com/512/2913/2913008.png'">
+            <div style="text-align: left;">
+              <h2 style="margin: 0; font-size: 14px; text-transform: uppercase; font-weight: 900;">Al-Naseeha High School</h2>
+              <p style="margin: 0; font-size: 9px; font-weight: bold; color: #666;">Chiniot, Punjab, Pakistan</p>
+            </div>
+          </div>
+          <p style="margin: 2px 0; font-size: 9px; font-weight: bold; color: #666;">Contact: 0300-1234567 | Session: 2023-24</p>
+          <div style="background: #000; color: #fff; display: inline-block; padding: 2px 10px; font-size: 10px; margin-top: 5px; font-weight: bold; border-radius: 2px;">
             ${title}
           </div>
         </div>
         
-        <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
-          <tr><td style="padding: 4px 0;"><strong>Student Name:</strong></td><td style="border-bottom: 1px dashed #000;">${student.name}</td></tr>
-          <tr><td style="padding: 4px 0;"><strong>Father Name:</strong></td><td style="border-bottom: 1px dashed #000;">${student.parentName}</td></tr>
-          <tr><td style="padding: 4px 0;"><strong>Roll No / Class:</strong></td><td style="border-bottom: 1px dashed #000;">${student.rollNumber} / ${student.grade}</td></tr>
-          <tr><td style="padding: 4px 0;"><strong>Fee Month:</strong></td><td style="border-bottom: 1px dashed #000;">${new Date().toLocaleString('default', { month: 'long' })}</td></tr>
+        <table style="width: 100%; font-size: 10px; border-collapse: collapse;">
+          <tr><td style="padding: 3px 0; width: 35%;"><strong>Challan ID:</strong></td><td style="border-bottom: 1px dashed #000;">${challan.id || 'N/A'}</td></tr>
+          <tr><td style="padding: 3px 0;"><strong>Student Name:</strong></td><td style="border-bottom: 1px dashed #000;">${challan.studentName}</td></tr>
+          <tr><td style="padding: 3px 0;"><strong>Roll No / Grade:</strong></td><td style="border-bottom: 1px dashed #000;">${challan.rollNumber} / ${challan.grade}</td></tr>
+          <tr><td style="padding: 3px 0;"><strong>Fee Month:</strong></td><td style="border-bottom: 1px dashed #000;">${challan.month} ${challan.year}</td></tr>
         </table>
 
-        <table style="width: 100%; margin-top: 15px; font-size: 11px; border: 1px solid #000;">
-          <tr style="background: #f0f0f0;"><th style="border: 1px solid #000; padding: 5px; text-align: left;">Description</th><th style="border: 1px solid #000; padding: 5px; text-align: right;">Amount</th></tr>
-          <tr><td style="border: 1px solid #000; padding: 5px;">Tuition Fee</td><td style="border: 1px solid #000; padding: 5px; text-align: right;">Rs.${student.monthlyFee}</td></tr>
-          <tr><td style="border: 1px solid #000; padding: 5px;">Previous Dues</td><td style="border: 1px solid #000; padding: 5px; text-align: right;">Rs.0</td></tr>
-          <tr><td style="border: 1px solid #000; padding: 5px;">Late Fine</td><td style="border: 1px solid #000; padding: 5px; text-align: right;">Rs.0</td></tr>
-          <tr style="font-weight: bold; font-size: 12px;"><td style="border: 1px solid #000; padding: 5px; background: #f0f0f0;">Total Payable</td><td style="border: 1px solid #000; padding: 5px; text-align: right; background: #f0f0f0;">Rs.${student.monthlyFee}</td></tr>
+        <table style="width: 100%; margin-top: 12px; font-size: 10px; border: 1px solid #000;">
+          <tr style="background: #f0f0f0;"><th style="border: 1px solid #000; padding: 4px; text-align: left;">Description</th><th style="border: 1px solid #000; padding: 4px; text-align: right;">Amount</th></tr>
+          <tr><td style="border: 1px solid #000; padding: 4px;">Tuition Fee</td><td style="border: 1px solid #000; padding: 4px; text-align: right;">Rs.${challan.monthlyFee?.toLocaleString()}</td></tr>
+          <tr>
+            <td style="border: 1px solid #000; padding: 4px;">
+              <strong>Arrears / Previous Dues</strong>
+              ${challan.arrearsDescription ? `<br><small style="color:#666;">(${challan.arrearsDescription})</small>` : ''}
+            </td>
+            <td style="border: 1px solid #000; padding: 4px; text-align: right;">Rs.${challan.arrears?.toLocaleString()}</td>
+          </tr>
+          <tr style="font-weight: bold; font-size: 11px;"><td style="border: 1px solid #000; padding: 4px; background: #f0f0f0;">Total Payable</td><td style="border: 1px solid #000; padding: 4px; text-align: right; background: #f0f0f0;">Rs.${challan.totalPayable?.toLocaleString()}</td></tr>
         </table>
 
-        <div style="margin-top: 30px; display: flex; justify-content: space-between; font-size: 10px;">
-          <div style="border-top: 1px solid #000; width: 100px; text-align: center; padding-top: 5px;">Bank/Cashier</div>
-          <div style="border-top: 1px solid #000; width: 100px; text-align: center; padding-top: 5px;">Parent/Guardian</div>
+        <div style="margin-top: 25px; display: flex; justify-content: space-between; font-size: 9px;">
+          <div style="border-top: 1px solid #000; width: 90px; text-align: center; padding-top: 3px;">Bank/Cashier</div>
+          <div style="border-top: 1px solid #000; width: 90px; text-align: center; padding-top: 3px;">Parent/Guardian</div>
         </div>
         
-        <p style="font-size: 8px; margin-top: 15px; color: #666; font-style: italic;">* Please pay dues before 10th of every month. Fee is non-refundable.</p>
-        <p style="font-size: 8px; text-align: right; color: #999;">Date: ${todayStr}</p>
+        <p style="font-size: 7px; margin-top: 10px; color: #666; font-style: italic;">* Due Date: ${challan.dueDate}. Please pay on time.</p>
+        <p style="font-size: 7px; text-align: right; color: #999; margin: 0;">Date: ${challan.issueDate}</p>
       </div>
     `;
+  };
+
+  const printChallan = (challan: FeeChallan) => {
+    const student = students.find(s => s.id === challan.studentId);
+    if (!student) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
 
     printWindow.document.write(`
       <html>
         <head>
           <title>Fee Challan - ${student.name}</title>
           <style>
-            body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; }
-            .challan-container { display: flex; justify-content: space-between; width: 100%; border-left: 1px dashed #ccc; border-right: 1px dashed #ccc; }
-            @media print { .challan-container { border: none; } }
+            body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 15px; }
+            .challan-container { display: flex; justify-content: space-between; width: 100%; }
+            @media print { .challan-container { page-break-after: always; } }
           </style>
         </head>
         <body onload="window.print(); window.close();">
           <div class="challan-container">
-            ${challanContent('School Copy')}
-            <div style="border-left: 1px dashed #ccc; margin: 0 10px;"></div>
-            ${challanContent('Student Copy')}
+            ${generateChallanHtmlMarkup({ ...challan, studentName: student.name, grade: student.grade, rollNumber: student.rollNumber }, 'School Copy')}
+            <div style="border-left: 1px dashed #666; margin: 0 5px;"></div>
+            ${generateChallanHtmlMarkup({ ...challan, studentName: student.name, grade: student.grade, rollNumber: student.rollNumber }, 'Student Copy')}
           </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const printBulkChallans = (challansToPrint: FeeChallan[]) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const allChallansHtml = challansToPrint.map(challan => {
+      const student = students.find(s => s.id === challan.studentId);
+      if (!student) return '';
+      return `
+        <div class="challan-container" style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 30px; page-break-inside: avoid; page-break-after: always; padding-bottom: 20px;">
+          ${generateChallanHtmlMarkup({ ...challan, studentName: student.name, grade: student.grade, rollNumber: student.rollNumber }, 'School Copy')}
+          <div style="border-left: 1px dashed #666; margin: 0 5px;"></div>
+          ${generateChallanHtmlMarkup({ ...challan, studentName: student.name, grade: student.grade, rollNumber: student.rollNumber }, 'Student Copy')}
+        </div>
+      `;
+    }).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Bulk Fee Challans - ${new Date().toLocaleString('default', { month: 'long' })}</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 10px; }
+            @media print { 
+              body { padding: 0; }
+              .challan-container { margin-bottom: 0 !important; padding: 20px !important; }
+            }
+          </style>
+        </head>
+        <body onload="window.print(); window.close();">
+          ${allChallansHtml}
         </body>
       </html>
     `);
@@ -1367,11 +1505,9 @@ function FeesView({
         </Card>
         <Card className="border border-border shadow-none rounded-xl bg-white">
           <CardContent className="p-6">
-            <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider mb-1">Collection Progress</p>
-            <h3 className="text-3xl font-bold text-primary">
-              {Math.round(((students.length - pendingStudents.length) / students.length) * 100)}%
-            </h3>
-            <p className="text-emerald-600 text-[11px] font-bold mt-2">Target: 100% Monthly</p>
+            <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider mb-1">Generated Challans</p>
+            <h3 className="text-3xl font-bold text-primary">{feeChallans.length}</h3>
+            <p className="text-emerald-600 text-[11px] font-bold mt-2">Active Inventory</p>
           </CardContent>
         </Card>
       </div>
@@ -1387,15 +1523,41 @@ function FeesView({
           onClick={() => setActiveTab('pending')}
           className="text-xs h-8 px-4"
         >Pending Dues ({pendingStudents.length})</Button>
+        <Button 
+          variant={activeTab === 'challans' ? 'default' : 'ghost'} 
+          onClick={() => setActiveTab('challans')}
+          className="text-xs h-8 px-4"
+        >Challan Management</Button>
       </div>
 
+      {activeTab !== 'challans' ? (
       <Card className="border border-border shadow-none rounded-xl overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-white no-print">
           <div>
-            <CardTitle className="text-lg font-bold">Fee Management Portfolio</CardTitle>
+            <CardTitle className="text-lg font-bold truncate max-w-[200px] sm:max-w-none">Fee Management Portfolio</CardTitle>
             <CardDescription className="text-xs">
-              {activeTab === 'all' ? 'Viewing all registered students' : 'List of students with pending fees for current month'}
+              {activeTab === 'all' ? 'Viewing all registered students' : 'List of students with pending fees'}
             </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => {
+                const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+                const currentYear = new Date().getFullYear();
+                const total = pendingStudents.reduce((sum, student) => sum + student.monthlyFee + (student.arrears || 0), 0);
+                alert(`Total Pending Demand for ${currentMonth}: Rs.${total.toLocaleString()}`);
+              }}
+              className="h-9 text-xs border-red-200 text-red-600 font-bold"
+            >
+              Defaulters Total
+            </Button>
+            <Button 
+              onClick={generateBulkChallansAction} 
+              className="bg-accent hover:bg-accent/90 text-white h-9 text-xs"
+            >
+              <Printer size={16} className="mr-2" /> Bulk Generate Challans
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -1455,7 +1617,27 @@ function FeesView({
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            onClick={() => printChallan(student)}
+                            onClick={() => {
+                              const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+                              const currentYear = new Date().getFullYear();
+                              const issueDate = new Date().toISOString().split('T')[0];
+                              const dueDate = new Date(new Date().getFullYear(), new Date().getMonth(), 10).toISOString().split('T')[0];
+                              const c: FeeChallan = {
+                                id: `CH-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+                                studentId: student.id,
+                                month: currentMonth,
+                                year: currentYear,
+                                monthlyFee: student.monthlyFee,
+                                arrears: student.arrears || 0,
+                                arrearsDescription: student.arrearsDescription,
+                                totalPayable: student.monthlyFee + (student.arrears || 0),
+                                issueDate,
+                                dueDate,
+                                status: 'issued'
+                              };
+                              onSaveChallans([c]);
+                              setActiveTab('challans');
+                            }}
                             className="text-muted-foreground h-7 text-[10px]"
                           ><Printer size={14} /></Button>
                         </div>
@@ -1468,6 +1650,59 @@ function FeesView({
           </div>
         </CardContent>
       </Card>
+      ) : (
+        <Card className="border border-border shadow-none rounded-xl overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-white">
+            <div>
+              <CardTitle className="text-lg font-bold underline decoration-accent">Generated Challans Repo</CardTitle>
+              <CardDescription className="text-xs italic">Manage issued challans for individual/bulk printing</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+             <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-background text-muted-foreground font-bold border-b border-border">
+                  <tr>
+                    <th className="px-6 py-4">Challan ID</th>
+                    <th className="px-6 py-4">Student</th>
+                    <th className="px-6 py-4">Period</th>
+                    <th className="px-6 py-4">Total Amount</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {feeChallans.length > 0 ? feeChallans.map((challan) => {
+                    const student = students.find(s => s.id === challan.studentId);
+                    return (
+                      <tr key={challan.id} className="hover:bg-background transition-colors">
+                        <td className="px-6 py-4 font-mono font-bold text-accent">{challan.id}</td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold">{student?.name || 'Unknown'}</div>
+                          <div className="text-[10px] text-muted-foreground">Class: {student?.grade}</div>
+                        </td>
+                        <td className="px-6 py-4 text-muted-foreground">{challan.month} {challan.year}</td>
+                        <td className="px-6 py-4 font-black">Rs.{challan.totalPayable.toLocaleString()}</td>
+                        <td className="px-6 py-4"><Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] uppercase font-bold">{challan.status}</Badge></td>
+                        <td className="px-6 py-4">
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => printChallan(challan)} className="h-7 text-[10px] font-bold border-primary/20 text-primary hover:bg-primary hover:text-white"><Printer size={12} className="mr-1" /> Print</Button>
+                            <Button variant="outline" size="sm" onClick={() => onDeleteChallan(challan.id)} className="h-7 text-[10px] font-bold border-red-200 text-red-600 hover:bg-red-600 hover:text-white">Delete</Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }) : (
+                    <tr>
+                      <td colSpan={6} className="p-10 text-center italic text-muted-foreground">No challans generated yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Record Fee Dialog */}
       <Dialog open={openRecord} onOpenChange={setOpenRecord}>
@@ -1518,52 +1753,84 @@ function FeesView({
             </div>
           </DialogHeader>
           <div className="p-6">
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-                <p className="text-[10px] font-bold text-emerald-700 uppercase">Paid Count</p>
-                <p className="text-xl font-black text-emerald-800">{studentLedger.length}</p>
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
+                  <p className="text-[10px] font-bold text-primary uppercase text-center mb-1 underline">Basic Info</p>
+                  <div className="text-[10px] space-y-1">
+                    <p><strong>Monthly:</strong> Rs.{selectedStudent?.monthlyFee.toLocaleString()}</p>
+                    <p><strong>Arrears:</strong> Rs.{selectedStudent?.arrears?.toLocaleString() || '0'}</p>
+                  </div>
+                </div>
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 flex flex-col items-center justify-center">
+                  <p className="text-[10px] font-bold text-emerald-700 uppercase">Paid Count</p>
+                  <p className="text-xl font-black text-emerald-800">{studentLedger.length}</p>
+                </div>
+                <div className="p-3 bg-red-50 rounded-xl border border-red-100 flex flex-col items-center justify-center">
+                  <p className="text-[10px] font-bold text-red-700 uppercase">Arrears Dues</p>
+                  <p className="text-lg font-black text-red-800">Rs.{selectedStudent?.arrears?.toLocaleString() || '0'}</p>
+                </div>
               </div>
-              <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
-                <p className="text-[10px] font-bold text-primary uppercase">Current Rate</p>
-                <p className="text-xl font-black text-primary">Rs.{selectedStudent?.monthlyFee.toLocaleString()}</p>
-              </div>
-              <div className="p-3 bg-red-50 rounded-xl border border-red-100">
-                <p className="text-[10px] font-bold text-red-700 uppercase">Dues Status</p>
-                <p className="text-xl font-black text-red-800">Clear</p>
-              </div>
-            </div>
-            
-            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Payment History</p>
-            <ScrollArea className="h-[300px] border border-border rounded-xl">
-              <table className="w-full text-[11px] text-left">
-                <thead className="bg-muted/50 font-bold sticky top-0 bg-white">
-                  <tr>
-                    <th className="p-3 border-b border-border">Month/Year</th>
-                    <th className="p-3 border-b border-border">Date Paid</th>
-                    <th className="p-3 border-b border-border text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {studentLedger.length > 0 ? studentLedger.map(record => (
-                    <tr key={record.id}>
-                      <td className="p-3 font-bold">{record.month} {record.year}</td>
-                      <td className="p-3 text-muted-foreground">{record.paymentDate}</td>
-                      <td className="p-3 text-right font-black text-emerald-600">Rs.{record.amount.toLocaleString()}</td>
-                    </tr>
-                  )) : (
+              
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Financial records</p>
+              <ScrollArea className="h-[300px] border border-border rounded-xl">
+                <table className="w-full text-[11px] text-left">
+                  <thead className="bg-muted/50 font-bold sticky top-0 bg-white">
                     <tr>
-                      <td colSpan={3} className="p-10 text-center italic text-muted-foreground">No payment history found for this student.</td>
+                      <th className="p-3 border-b border-border">Type / Month</th>
+                      <th className="p-3 border-b border-border">Reference / Date</th>
+                      <th className="p-3 border-b border-border text-right">Amount</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </ScrollArea>
-            <div className="mt-6 flex justify-end gap-3">
-              <Button variant="outline" size="sm" onClick={() => setOpenLedger(false)} className="h-9 text-xs">Close Ledger</Button>
-              <Button size="sm" onClick={() => selectedStudent && printChallan(selectedStudent)} className="h-9 text-xs flex items-center gap-2">
-                <Printer size={14} /> Print Fresh Challan
-              </Button>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {selectedStudent?.arrears ? (
+                      <tr className="bg-amber-50">
+                        <td className="p-3 font-bold text-amber-800 uppercase text-[9px]">Opening Balance (Arrears)</td>
+                        <td className="p-3 text-amber-600 text-[9px]">{selectedStudent.arrearsDescription || 'Previous pending fee'}</td>
+                        <td className="p-3 text-right font-black text-amber-800">Rs.{selectedStudent.arrears.toLocaleString()}</td>
+                      </tr>
+                    ) : null}
+                    {studentLedger.length > 0 ? studentLedger.map(record => (
+                      <tr key={record.id}>
+                        <td className="p-3 font-bold">Monthly Fee: {record.month} {record.year}</td>
+                        <td className="p-3 text-muted-foreground">{record.paymentDate}</td>
+                        <td className="p-3 text-right font-black text-emerald-600">Rs.{record.amount.toLocaleString()}</td>
+                      </tr>
+                    )) : !selectedStudent?.arrears && (
+                      <tr>
+                        <td colSpan={3} className="p-10 text-center italic text-muted-foreground">No payment history or opening balance found.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </ScrollArea>
+              <div className="mt-6 flex justify-end gap-3">
+                <Button variant="outline" size="sm" onClick={() => setOpenLedger(false)} className="h-9 text-xs">Close Ledger</Button>
+                <Button size="sm" onClick={() => {
+                   if (!selectedStudent) return;
+                    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+                    const currentYear = new Date().getFullYear();
+                    const issueDate = new Date().toISOString().split('T')[0];
+                    const dueDate = new Date(new Date().getFullYear(), new Date().getMonth(), 10).toISOString().split('T')[0];
+                    const c: FeeChallan = {
+                      id: `CH-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+                      studentId: selectedStudent.id,
+                      month: currentMonth,
+                      year: currentYear,
+                      monthlyFee: selectedStudent.monthlyFee,
+                      arrears: selectedStudent.arrears || 0,
+                      arrearsDescription: selectedStudent.arrearsDescription,
+                      totalPayable: selectedStudent.monthlyFee + (selectedStudent.arrears || 0),
+                      issueDate,
+                      dueDate,
+                      status: 'issued'
+                    };
+                    onSaveChallans([c]);
+                    setOpenLedger(false);
+                    setActiveTab('challans');
+                }} className="h-9 text-xs flex items-center gap-2 bg-primary">
+                  <Printer size={14} /> Issued & Manage Challan
+                </Button>
+              </div>
           </div>
         </DialogContent>
       </Dialog>
