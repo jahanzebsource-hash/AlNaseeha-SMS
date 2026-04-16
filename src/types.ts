@@ -114,3 +114,52 @@ export interface FinanceTransaction {
   month: string;
   year: number;
 }
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: string;
+  purchasePrice: number;
+  salePrice: number;
+  stockQuantity: number;
+}
+
+export interface InvoiceItem {
+  inventoryItemId: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number; // Percentage
+  subtotal: number;
+}
+
+export interface InventoryInvoice {
+  id: string;
+  type: 'purchase' | 'sale';
+  date: string;
+  studentId?: string;
+  vendorName?: string;
+  items: InvoiceItem[];
+  extraExpense?: number;
+  extraExpenseReason?: string;
+  totalAmount: number;
+  amountPaid: number;
+  paymentStatus: 'paid' | 'partial' | 'unpaid';
+  month: string;
+  year: number;
+}
+
+export interface Vendor {
+  id: string;
+  name: string;
+  contact: string;
+  openingBalance: number;
+}
+
+export interface VendorPayment {
+  id: string;
+  vendorName: string; // Linking by name as per user's current flow
+  amount: number;
+  date: string;
+  description: string;
+}

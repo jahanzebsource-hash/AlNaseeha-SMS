@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   Users, 
@@ -33,7 +33,13 @@ import {
   Trash2,
   Edit,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  BookOpen,
+  ShoppingCart,
+  Package,
+  History,
+  Archive,
+  Calculator
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -42,6 +48,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { 
@@ -51,17 +62,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Student, Teacher, PayrollRecord, Attendance, FeeRecord, FeeChallan, FinanceTransaction, TransactionType, IncomeCategory, ExpenseCategory } from './types';
+import { 
+  Student, 
+  Teacher, 
+  PayrollRecord, 
+  Attendance, 
+  FeeRecord, 
+  FeeChallan, 
+  FinanceTransaction, 
+  TransactionType, 
+  IncomeCategory, 
+  ExpenseCategory,
+  InventoryItem,
+  InventoryInvoice,
+  InvoiceItem,
+  Vendor,
+  VendorPayment
+} from './types';
 import { 
   mockStudents, 
   mockTeachers, 
   mockAnnouncements, 
   mockAttendance, 
   mockFees,
-  mockTransactions
+  mockTransactions,
+  mockInventory,
+  mockVendors,
+  mockVendorPayments
 } from './lib/mockData';
 
-type View = 'dashboard' | 'students' | 'teachers' | 'attendance' | 'fees' | 'exams' | 'announcements' | 'finance';
+type View = 'dashboard' | 'students' | 'teachers' | 'attendance' | 'fees' | 'exams' | 'announcements' | 'finance' | 'cashbook' | 'inventory';
 
 const SCHOOL_CLASSES = [
   'Play Group', 'Nursery', 'KG', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'
@@ -78,7 +108,11 @@ export default function App() {
   const [attendance, setAttendance] = useState<Attendance[]>(mockAttendance as Attendance[]);
   const [feeRecords, setFeeRecords] = useState<FeeRecord[]>(mockFees as FeeRecord[]);
   const [feeChallans, setFeeChallans] = useState<FeeChallan[]>([]);
-  const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
+  const [transactions, setTransactions] = useState<FinanceTransaction[]>(mockTransactions);
+  const [inventory, setInventory] = useState<InventoryItem[]>(mockInventory);
+  const [invoices, setInvoices] = useState<InventoryInvoice[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>(mockVendors);
+  const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>(mockVendorPayments);
 
   const totalMonthlyFee = useMemo(() => {
     return students.reduce((sum, student) => sum + student.monthlyFee, 0);
@@ -91,6 +125,8 @@ export default function App() {
     { id: 'attendance', label: 'Attendance System', icon: CalendarCheck },
     { id: 'fees', label: 'Fee & Financials', icon: CreditCard },
     { id: 'finance', label: 'Income & Expense', icon: Receipt },
+    { id: 'cashbook', label: 'Daily Cashbook', icon: Calculator },
+    { id: 'inventory', label: 'Inventory & Sale', icon: Package },
     { id: 'exams', label: 'Examinations', icon: GraduationCap },
     { id: 'announcements', label: 'Announcements', icon: Bell },
   ];
@@ -152,6 +188,76 @@ export default function App() {
             transactions={transactions}
             onAddTransaction={(t) => setTransactions(prev => [...prev, t])}
             onDeleteTransaction={(id) => setTransactions(prev => prev.filter(tr => tr.id !== id))}
+          />
+        );
+      case 'cashbook':
+        return (
+          <CashbookView 
+            transactions={transactions}
+            invoices={invoices}
+          />
+        );
+      case 'inventory':
+        return (
+          <InventoryView 
+            students={students}
+            inventory={inventory}
+            invoices={invoices}
+            vendors={vendors}
+            vendorPayments={vendorPayments}
+            onAddVendorPayment={(p) => setVendorPayments(prev => [...prev, p])}
+            onAddInvoice={(invoice) => {
+              setInvoices(prev => [...prev, invoice]);
+              // Update stock when sale or purchase
+              setInventory(prev => prev.map(item => {
+                const invoiceItems = invoice.items.filter(ii => ii.inventoryItemId === item.id);
+                if (invoiceItems.length > 0) {
+                  const totalQty = invoiceItems.reduce((s, i) => s + i.quantity, 0);
+                  return {
+                    ...item,
+                    stockQuantity: invoice.type === 'purchase' 
+                      ? item.stockQuantity + totalQty 
+                      : item.stockQuantity - totalQty
+                  };
+                }
+                return item;
+              }));
+              // Record income/expense in finance transactions
+              // Only record the AMOUNT PAID as actual cash flow
+              if (invoice.amountPaid > 0) {
+                const newTrans: FinanceTransaction = {
+                  id: Math.random().toString(36).substr(2, 9),
+                  type: invoice.type === 'purchase' ? 'expense' : 'income',
+                  category: 'Stationery Sale', // Simplified
+                  amount: invoice.amountPaid,
+                  date: invoice.date,
+                  description: `${invoice.type === 'purchase' ? 'Purchase' : 'Sale'} Receipt: ${invoice.id}`,
+                  month: invoice.month,
+                  year: invoice.year,
+                  studentId: invoice.studentId
+                };
+                setTransactions(prev => [...prev, newTrans]);
+              }
+            }}
+            onUpdateInvoice={(invoice, paymentReceived) => {
+              setInvoices(prev => prev.map(inv => inv.id === invoice.id ? invoice : inv));
+              if (paymentReceived && paymentReceived > 0) {
+                const newTrans: FinanceTransaction = {
+                  id: Math.random().toString(36).substr(2, 9),
+                  type: invoice.type === 'purchase' ? 'expense' : 'income',
+                  category: 'Stationery Sale',
+                  amount: paymentReceived,
+                  date: new Date().toISOString().split('T')[0],
+                  description: `Remaining Payment for ${invoice.type === 'purchase' ? 'Purchase' : 'Sale'} ${invoice.id}`,
+                  month: new Date().toLocaleString('default', { month: 'long' }),
+                  year: new Date().getFullYear(),
+                  studentId: invoice.studentId
+                };
+                setTransactions(prev => [...prev, newTrans]);
+              }
+            }}
+            onDeleteInvoice={(id) => setInvoices(prev => prev.filter(inv => inv.id !== id))}
+            onUpdateVendor={(vendor) => setVendors(prev => prev.map(v => v.id === vendor.id ? vendor : v))}
           />
         );
       case 'exams':
@@ -507,11 +613,11 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
           </div>
           
           <Dialog open={open} onOpenChange={handleOpenChange}>
-          <DialogTrigger asChild>
+          <DialogTrigger render={
             <Button className="bg-accent hover:bg-accent/90 text-white h-9 text-xs">
               <Plus size={16} className="mr-2" /> Admission Form
             </Button>
-          </DialogTrigger>
+          } />
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>{editingStudent ? 'Edit Student Details' : 'New Student Admission'}</DialogTitle>
@@ -2084,6 +2190,155 @@ function ExamsView({ students }: { students: Student[] }) {
   );
 }
 
+function CashbookView({ 
+  transactions, 
+  invoices
+}: { 
+  transactions: FinanceTransaction[],
+  invoices: InventoryInvoice[]
+}) {
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  const dailyTransactions = useMemo(() => {
+    return transactions.filter(t => t.date === selectedDate);
+  }, [transactions, selectedDate]);
+
+  const dailyInvoices = useMemo(() => {
+    return invoices.filter(i => i.date === selectedDate);
+  }, [invoices, selectedDate]);
+
+  const totalIn = dailyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0) +
+               dailyInvoices.filter(i => i.type === 'sale').reduce((sum, i) => sum + i.totalAmount, 0);
+               
+  const totalOut = dailyTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0) +
+                dailyInvoices.filter(i => i.type === 'purchase').reduce((sum, i) => sum + i.totalAmount, 0);
+
+  const netCash = totalIn - totalOut;
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-none shadow-none rounded-xl bg-white overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/20">
+          <div>
+            <CardTitle className="text-xl font-black">Daily Cashbook</CardTitle>
+            <CardDescription className="text-xs">Real-time tracking of daily cash flow</CardDescription>
+          </div>
+          <div className="flex items-center gap-4">
+            <Label className="text-xs font-bold">Select Date:</Label>
+            <Input 
+              type="date" 
+              value={selectedDate} 
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="h-9 w-40 text-xs"
+            />
+            <Button variant="outline" size="sm" onClick={() => window.print()} className="h-9 text-xs border-primary text-primary">
+              <Printer size={16} className="mr-2" /> Print Day Sheet
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="grid grid-cols-1 md:grid-cols-3 divide-x divide-border">
+            <div className="p-6 text-center">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Cash Inward</p>
+              <h3 className="text-2xl font-black text-emerald-600">Rs.{totalIn.toLocaleString()}</h3>
+            </div>
+            <div className="p-6 text-center">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Cash Outward</p>
+              <h3 className="text-2xl font-black text-rose-600">Rs.{totalOut.toLocaleString()}</h3>
+            </div>
+            <div className="p-6 text-center">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Closing Balance</p>
+              <h3 className={`text-2xl font-black ${netCash >= 0 ? 'text-primary' : 'text-red-700'}`}>
+                Rs.{netCash.toLocaleString()}
+              </h3>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Cash In Table */}
+        <Card className="border border-border shadow-none rounded-xl overflow-hidden">
+          <CardHeader className="bg-emerald-50/50 border-b">
+            <CardTitle className="text-sm font-black text-emerald-800 flex items-center gap-2">
+              <ArrowDownRight className="h-4 w-4" /> CASSH IN (INCOME)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-muted/30 font-bold border-b">
+                <tr>
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3">Description</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {dailyTransactions.filter(t => t.type === 'income').map(t => (
+                  <tr key={t.id}>
+                    <td className="px-4 py-3 font-bold">{t.category}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{t.description}</td>
+                    <td className="px-4 py-3 text-right font-black text-emerald-600">Rs.{t.amount.toLocaleString()}</td>
+                  </tr>
+                ))}
+                {dailyInvoices.filter(i => i.type === 'sale').map(i => (
+                  <tr key={i.id}>
+                    <td className="px-4 py-3 font-bold">Inventory Sale</td>
+                    <td className="px-4 py-3 text-muted-foreground">Invoice: {i.id}</td>
+                    <td className="px-4 py-3 text-right font-black text-emerald-600">Rs.{i.totalAmount.toLocaleString()}</td>
+                  </tr>
+                ))}
+                {dailyTransactions.filter(t => t.type === 'income').length === 0 && dailyInvoices.filter(i => i.type === 'sale').length === 0 && (
+                   <tr><td colSpan={3} className="p-6 text-center italic text-muted-foreground">No income recorded today</td></tr>
+                )}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+
+        {/* Cash Out Table */}
+        <Card className="border border-border shadow-none rounded-xl overflow-hidden">
+          <CardHeader className="bg-rose-50/50 border-b">
+            <CardTitle className="text-sm font-black text-rose-800 flex items-center gap-2">
+              <ArrowUpRight className="h-4 w-4" /> CASH OUT (EXPENSE)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-muted/30 font-bold border-b">
+                <tr>
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3">Description</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {dailyTransactions.filter(t => t.type === 'expense').map(t => (
+                  <tr key={t.id}>
+                    <td className="px-4 py-3 font-bold">{t.category}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{t.description}</td>
+                    <td className="px-4 py-3 text-right font-black text-rose-600">Rs.{t.amount.toLocaleString()}</td>
+                  </tr>
+                ))}
+                {dailyInvoices.filter(i => i.type === 'purchase').map(i => (
+                  <tr key={i.id}>
+                    <td className="px-4 py-3 font-bold">Inventory Purchase</td>
+                    <td className="px-4 py-3 text-muted-foreground">Invoice: {i.id}</td>
+                    <td className="px-4 py-3 text-right font-black text-rose-600">Rs.{i.totalAmount.toLocaleString()}</td>
+                  </tr>
+                ))}
+                {dailyTransactions.filter(t => t.type === 'expense').length === 0 && dailyInvoices.filter(i => i.type === 'purchase').length === 0 && (
+                   <tr><td colSpan={3} className="p-6 text-center italic text-muted-foreground">No expense recorded today</td></tr>
+                )}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 function FinanceView({ 
   students, 
   transactions, 
@@ -2097,6 +2352,7 @@ function FinanceView({
 }) {
   const [activeTab, setActiveTab] = useState<'transactions' | 'balancesheet'>('transactions');
   const [openAdd, setOpenAdd] = useState(false);
+  const [financeSearch, setFinanceSearch] = useState('');
   const [formData, setFormData] = useState({
     type: 'income' as TransactionType,
     category: 'Admission' as IncomeCategory | ExpenseCategory,
@@ -2133,6 +2389,18 @@ function FinanceView({
       date: new Date().toISOString().split('T')[0]
     });
   };
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => {
+      const searchLower = financeSearch.toLowerCase();
+      const student = t.studentId ? students.find(s => s.id === t.studentId) : null;
+      return (
+        t.description.toLowerCase().includes(searchLower) ||
+        t.category.toLowerCase().includes(searchLower) ||
+        (student && student.name.toLowerCase().includes(searchLower))
+      );
+    });
+  }, [transactions, financeSearch, students]);
 
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
   const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
@@ -2274,13 +2542,24 @@ function FinanceView({
       {activeTab === 'transactions' ? (
         <Card className="border border-border shadow-none rounded-xl overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-white">
-            <div>
+            <div className="flex-1">
               <CardTitle className="text-lg font-black">Financial Transactions</CardTitle>
               <CardDescription className="text-xs">Record and track all cash flows</CardDescription>
             </div>
-            <Button onClick={() => setOpenAdd(true)} className="bg-primary hover:bg-primary/90 text-white h-9 text-xs">
-              <Plus size={16} className="mr-2" /> Add Transaction
-            </Button>
+            <div className="flex items-center gap-3">
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search transactions or students..." 
+                  className="pl-9 h-9 text-xs"
+                  value={financeSearch}
+                  onChange={(e) => setFinanceSearch(e.target.value)}
+                />
+              </div>
+              <Button onClick={() => setOpenAdd(true)} className="bg-primary hover:bg-primary/90 text-white h-9 text-xs font-bold">
+                <Plus size={16} className="mr-2" /> Add Record
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -2296,7 +2575,7 @@ function FinanceView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {transactions.length > 0 ? [...transactions].reverse().map((t) => (
+                  {filteredTransactions.length > 0 ? [...filteredTransactions].reverse().map((t) => (
                     <tr key={t.id} className="hover:bg-background transition-colors">
                       <td className="px-6 py-4 text-muted-foreground">{t.date}</td>
                       <td className="px-6 py-4">
@@ -2471,6 +2750,751 @@ function FinanceView({
               <Button type="submit" className="bg-primary hover:bg-primary/90 h-10 text-xs font-black">Save Transaction</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function InventoryView({ 
+  students, 
+  inventory, 
+  invoices, 
+  vendors,
+  vendorPayments,
+  onAddVendorPayment,
+  onAddInvoice,
+  onDeleteInvoice,
+  onUpdateInvoice,
+  onUpdateVendor
+}: { 
+  students: Student[], 
+  inventory: InventoryItem[], 
+  invoices: InventoryInvoice[],
+  vendors: Vendor[],
+  vendorPayments: VendorPayment[],
+  onAddVendorPayment: (p: VendorPayment) => void,
+  onAddInvoice: (i: InventoryInvoice) => void,
+  onDeleteInvoice: (id: string) => void,
+  onUpdateInvoice: (i: InventoryInvoice, payment?: number) => void,
+  onUpdateVendor: (v: Vendor) => void
+}) {
+  const [activeTab, setActiveTab] = useState<'stock' | 'purchase' | 'sale' | 'history' | 'report' | 'vendorledger'>('stock');
+  const [invoiceTypeFilter, setInvoiceTypeFilter] = useState<'all' | 'purchase' | 'sale'>('all');
+  const [selectedVendor, setSelectedVendor] = useState<string>('');
+  const [showAddPayment, setShowAddPayment] = useState(false);
+  const [paymentBalanceRecord, setPaymentBalanceRecord] = useState<{ invoiceId: string; amount: string } | null>(null);
+  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '',
+    date: new Date().toISOString().split('T')[0],
+    description: ''
+  });
+
+  // Reusable SearchableSelect for Inventory Items
+  const SearchableSelect = ({ items, value, onSelect, placeholder }: { items: {id: string, name: string}[], value: string, onSelect: (v: string) => void, placeholder: string }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const filtered = items.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));
+    const selected = items.find(i => i.id === value);
+    
+    return (
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger render={
+          <Button variant="outline" className="w-full h-8 text-[10px] justify-between px-2 font-normal bg-white">
+            <span className="truncate">{selected ? selected.name : placeholder}</span>
+            <Search size={12} className="opacity-50 shrink-0" />
+          </Button>
+        } />
+        <PopoverContent className="p-0 w-64" align="start">
+          <div className="p-2 border-b bg-background sticky top-0">
+            <Input 
+              placeholder="Search items..." 
+              value={search} 
+              onChange={e => setSearch(e.target.value)} 
+              className="h-8 text-[10px] focus-visible:ring-0"
+              autoFocus
+            />
+          </div>
+          <div className="max-h-60 overflow-y-auto p-1 custom-scrollbar">
+            {filtered.length === 0 && <div className="p-2 text-[10px] text-center italic text-muted-foreground">No items match</div>}
+            {filtered.map(item => (
+              <div 
+                key={item.id} 
+                className={`p-2 text-[10px] cursor-pointer rounded-md hover:bg-accent transition-colors ${value === item.id ? 'bg-accent font-bold' : ''}`}
+                onClick={() => {
+                  onSelect(item.id);
+                  setIsOpen(false);
+                  setSearch('');
+                }}
+              >
+                {item.name}
+              </div>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
+  const [invoiceForm, setInvoiceForm] = useState<{
+    type: 'purchase' | 'sale';
+    vendorName: string;
+    studentId: string;
+    items: { inventoryItemId: string; quantity: number; unitPrice: number; discount: number }[];
+    extraExpense: string;
+    extraExpenseReason: string;
+    amountPaid: string;
+    date: string;
+  }>({
+    type: 'purchase',
+    vendorName: '',
+    studentId: '',
+    items: [{ inventoryItemId: '', quantity: 0, unitPrice: 0, discount: 0 }],
+    extraExpense: '',
+    extraExpenseReason: '',
+    amountPaid: '',
+    date: new Date().toISOString().split('T')[0]
+  });
+
+  // Sync type with activeTab
+  useEffect(() => {
+    if (activeTab === 'purchase') setInvoiceForm(prev => ({ ...prev, type: 'purchase' }));
+    if (activeTab === 'sale') setInvoiceForm(prev => ({ ...prev, type: 'sale' }));
+  }, [activeTab]);
+
+  const handleAddRow = () => {
+    setInvoiceForm({
+      ...invoiceForm,
+      items: [...invoiceForm.items, { inventoryItemId: '', quantity: 0, unitPrice: 0, discount: 0 }]
+    });
+  };
+
+  const handleItemChange = (index: number, field: string, value: any) => {
+    const newItems = [...invoiceForm.items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    
+    // Auto populate unit price based on real-time selection
+    if (field === 'inventoryItemId') {
+      const item = inventory.find(i => i.id === value);
+      if (item) {
+        newItems[index].unitPrice = invoiceForm.type === 'sale' ? item.salePrice : item.purchasePrice;
+      }
+    }
+    
+    setInvoiceForm({ ...invoiceForm, items: newItems });
+  };
+
+  const calculateTotal = () => {
+    const itemsTotal = invoiceForm.items.reduce((sum, item) => {
+      const discountedPrice = item.unitPrice * (1 - (item.discount || 0) / 100);
+      return sum + (item.quantity * discountedPrice);
+    }, 0);
+    return itemsTotal + Number(invoiceForm.extraExpense || 0);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const total = calculateTotal();
+    const paid = Number(invoiceForm.amountPaid || 0);
+    
+    let status: 'paid' | 'partial' | 'unpaid' = 'unpaid';
+    if (paid >= total) status = 'paid';
+    else if (paid > 0) status = 'partial';
+
+    const invoiceItems: InvoiceItem[] = invoiceForm.items.map(ii => {
+      const discountedPrice = ii.unitPrice * (1 - (ii.discount || 0) / 100);
+      return {
+        inventoryItemId: ii.inventoryItemId,
+        name: inventory.find(i => i.id === ii.inventoryItemId)?.name || 'Unknown',
+        quantity: ii.quantity,
+        unitPrice: ii.unitPrice,
+        discount: ii.discount,
+        subtotal: ii.quantity * discountedPrice
+      };
+    });
+
+    const newInvoice: InventoryInvoice = {
+      id: `${invoiceForm.type === 'purchase' ? 'PUR' : 'SAL'}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+      type: invoiceForm.type,
+      date: invoiceForm.date,
+      vendorName: invoiceForm.type === 'purchase' ? invoiceForm.vendorName : undefined,
+      studentId: invoiceForm.type === 'sale' ? invoiceForm.studentId : undefined,
+      items: invoiceItems,
+      extraExpense: Number(invoiceForm.extraExpense || 0),
+      extraExpenseReason: invoiceForm.extraExpenseReason,
+      totalAmount: total,
+      amountPaid: paid,
+      paymentStatus: status,
+      month: new Date(invoiceForm.date).toLocaleString('default', { month: 'long' }),
+      year: new Date(invoiceForm.date).getFullYear()
+    };
+
+    onAddInvoice(newInvoice);
+    setActiveTab('history');
+    setInvoiceForm({
+      type: 'purchase',
+      vendorName: '',
+      studentId: '',
+      items: [{ inventoryItemId: '', quantity: 0, unitPrice: 0, discount: 0 }],
+      extraExpense: '',
+      extraExpenseReason: '',
+      amountPaid: '',
+      date: new Date().toISOString().split('T')[0]
+    });
+  };
+
+  const filteredInvoices = invoices.filter(inv => {
+    if (invoiceTypeFilter === 'all') return true;
+    return inv.type === invoiceTypeFilter;
+  });
+
+  const purchaseTotal = invoices.filter(i => i.type === 'purchase').reduce((sum, i) => sum + i.totalAmount, 0);
+  const saleTotal = invoices.filter(i => i.type === 'sale').reduce((sum, i) => sum + i.totalAmount, 0);
+  const grossProfit = saleTotal - purchaseTotal;
+
+  // Vendor Ledger Logic
+  const vendorData = vendors.find(v => v.name === selectedVendor);
+  const vendorTransactions = useMemo(() => {
+    if (!selectedVendor) return [];
+    const purchases = invoices.filter(i => i.type === 'purchase' && i.vendorName === selectedVendor);
+    const payments = vendorPayments.filter(p => p.vendorName === selectedVendor);
+    
+    return [
+      ...purchases.map(p => ({ date: p.date, description: `Invoice #${p.id}`, debit: p.totalAmount, credit: 0 })),
+      ...payments.map(p => ({ date: p.date, description: p.description, debit: 0, credit: p.amount }))
+    ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [selectedVendor, invoices, vendorPayments]);
+
+  const vendorBalance = useMemo(() => {
+    if (!vendorData) return 0;
+    const totalPurchase = vendorTransactions.reduce((sum, t) => sum + t.debit, 0);
+    const totalPaid = vendorTransactions.reduce((sum, t) => sum + t.credit, 0);
+    return vendorData.openingBalance + totalPurchase - totalPaid;
+  }, [vendorData, vendorTransactions]);
+
+  const handleAddPayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedVendor) return;
+    const payment: VendorPayment = {
+      id: `VP-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+      vendorName: selectedVendor,
+      amount: Number(paymentForm.amount),
+      date: paymentForm.date,
+      description: paymentForm.description
+    };
+    onAddVendorPayment(payment);
+    setShowAddPayment(false);
+    setPaymentForm({ amount: '', date: new Date().toISOString().split('T')[0], description: '' });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex bg-muted p-1 rounded-lg w-fit no-print">
+        <Button variant={activeTab === 'stock' ? 'default' : 'ghost'} onClick={() => setActiveTab('stock')} className="text-xs h-8 px-4">Stock Repo</Button>
+        <Button variant={activeTab === 'purchase' ? 'default' : 'ghost'} onClick={() => setActiveTab('purchase')} className="text-xs h-8 px-4">New Purchase</Button>
+        <Button variant={activeTab === 'sale' ? 'default' : 'ghost'} onClick={() => setActiveTab('sale')} className="text-xs h-8 px-4">New Sale</Button>
+        <Button variant={activeTab === 'history' ? 'default' : 'ghost'} onClick={() => setActiveTab('history')} className="text-xs h-8 px-4">Invoice Logs</Button>
+        <Button variant={activeTab === 'vendorledger' ? 'default' : 'ghost'} onClick={() => setActiveTab('vendorledger')} className="text-xs h-8 px-4">Vendor Ledger</Button>
+        <Button variant={activeTab === 'report' ? 'default' : 'ghost'} onClick={() => setActiveTab('report')} className="text-xs h-8 px-4">Balance Sheet</Button>
+      </div>
+
+      {activeTab === 'stock' && (
+        <Card className="border border-border shadow-none rounded-xl overflow-hidden">
+          <CardHeader className="bg-white border-b">
+            <CardTitle className="text-lg font-black">Inventory Stock Repository</CardTitle>
+            <CardDescription className="text-xs">Real-time counts for books, stationery and uniforms</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-background text-muted-foreground font-bold border-b border-border">
+                  <tr>
+                    <th className="px-6 py-4">Item Name</th>
+                    <th className="px-6 py-4">Category</th>
+                    <th className="px-6 py-4">Purchase Price</th>
+                    <th className="px-6 py-4">Sale Price</th>
+                    <th className="px-6 py-4">Current Stock</th>
+                    <th className="px-6 py-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {inventory.map(item => (
+                    <tr key={item.id} className="hover:bg-background transition-colors">
+                      <td className="px-6 py-4 font-bold">{item.name}</td>
+                      <td className="px-6 py-4">{item.category}</td>
+                      <td className="px-6 py-4">Rs.{item.purchasePrice}</td>
+                      <td className="px-6 py-4">Rs.{item.salePrice}</td>
+                      <td className="px-6 py-4 font-black">{item.stockQuantity} Units</td>
+                      <td className="px-6 py-4">
+                        <Badge className={item.stockQuantity < 10 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}>
+                          {item.stockQuantity < 10 ? 'Low Stock' : 'Available'}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {(activeTab === 'purchase' || activeTab === 'sale') && (
+        <Card className="border border-border shadow-none rounded-xl overflow-hidden max-w-4xl">
+          <CardHeader className="bg-white border-b">
+            <CardTitle className="text-lg font-black">{activeTab === 'purchase' ? 'Create Purchase Invoice' : 'Create Sale Invoice'}</CardTitle>
+            <CardDescription className="text-xs">
+              {activeTab === 'purchase' ? 'Record stock arrival from vendors' : 'Issue items to students'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold">Transaction Date</Label>
+                  <Input 
+                    type="date" 
+                    value={invoiceForm.date} 
+                    onChange={(e) => setInvoiceForm({...invoiceForm, date: e.target.value})} 
+                    className="h-9 text-xs" 
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold">{activeTab === 'purchase' ? 'Vendor / Supplier Name' : 'Select Student'}</Label>
+                  {activeTab === 'purchase' ? (
+                    <Input 
+                      placeholder="e.g. ABC Books Distributor" 
+                      value={invoiceForm.vendorName} 
+                      onChange={(e) => setInvoiceForm({...invoiceForm, vendorName: e.target.value})}
+                      className="h-9 text-xs"
+                      required
+                    />
+                  ) : (
+                    <Select value={invoiceForm.studentId} onValueChange={(v) => setInvoiceForm({...invoiceForm, studentId: v})}>
+                      <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Search student..." /></SelectTrigger>
+                      <SelectContent>
+                        {students.map(s => <SelectItem key={s.id} value={s.id}>{s.name} ({s.rollNumber})</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Invoice Items</h4>
+                  <Button type="button" variant="outline" size="sm" onClick={handleAddRow} className="h-7 text-[10px] border-primary text-primary font-bold"><Plus size={12} className="mr-1" /> Add Item Row</Button>
+                </div>
+                <div className="border border-border rounded-xl p-4 space-y-3 bg-muted/20">
+                  {invoiceForm.items.map((row, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-3 items-end">
+                      <div className="col-span-4 space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">Select Item</Label>
+                        <SearchableSelect 
+                          items={inventory.map(i => ({ id: i.id, name: i.name }))} 
+                          value={row.inventoryItemId} 
+                          onSelect={(v) => handleItemChange(idx, 'inventoryItemId', v)} 
+                          placeholder="Search Item..." 
+                        />
+                      </div>
+                      <div className="col-span-1.5 space-y-1">
+                        <Label className="text-[10px] text-muted-foreground text-center block">Qty</Label>
+                        <Input type="number" value={row.quantity} onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value))} className="h-8 text-[10px] text-center" />
+                      </div>
+                      <div className="col-span-2.5 space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">Unit Price</Label>
+                        <Input type="number" value={row.unitPrice} onChange={(e) => handleItemChange(idx, 'unitPrice', Number(e.target.value))} className="h-8 text-[10px]" />
+                      </div>
+                      <div className="col-span-2 space-y-1">
+                        <Label className="text-[10px] text-muted-foreground text-center block">Disc %</Label>
+                        <Input type="number" value={row.discount} onChange={(e) => handleItemChange(idx, 'discount', Number(e.target.value))} className="h-8 text-[10px] text-center" placeholder="0" />
+                      </div>
+                      <div className="col-span-2 pb-1 text-right">
+                         <div className="text-[10px] font-black text-primary truncate">Rs.{(row.quantity * row.unitPrice * (1 - (row.discount || 0) / 100)).toLocaleString()}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 p-4 bg-muted/50 rounded-xl">
+                 <div className="space-y-2">
+                    <Label className="text-xs font-bold">Extra Expenses (Fare/Freight)</Label>
+                    <Input type="number" value={invoiceForm.extraExpense} onChange={(e) => setInvoiceForm({...invoiceForm, extraExpense: e.target.value})} className="h-9 text-xs" placeholder="0" />
+                 </div>
+                 <div className="space-y-2">
+                    <Label className="text-xs font-bold">Expense Detail</Label>
+                    <Input value={invoiceForm.extraExpenseReason} onChange={(e) => setInvoiceForm({...invoiceForm, extraExpenseReason: e.target.value})} className="h-9 text-xs" placeholder="e.g. Rikshaw fare" />
+                 </div>
+              </div>
+
+              {activeTab === 'sale' && (
+                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl space-y-3">
+                  <h4 className="text-xs font-black text-emerald-800 uppercase tracking-widest">Payment Settlement</h4>
+                  <div className="grid grid-cols-3 gap-6">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-bold">Amount Received</Label>
+                      <Input 
+                        type="number" 
+                        value={invoiceForm.amountPaid} 
+                        onChange={(e) => setInvoiceForm({...invoiceForm, amountPaid: e.target.value})} 
+                        className="h-9 text-xs border-emerald-200"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div className="col-span-2 pt-6">
+                       <p className="text-[11px] text-emerald-700 italic">
+                         Enter the amount paid by the student. {Number(invoiceForm.amountPaid) < calculateTotal() ? 'The balance will be saved as Credit.' : 'Payment is full.'}
+                       </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center pt-6 border-t font-black">
+                <div className="text-xl">Grand Total: <span className="text-primary">Rs.{calculateTotal().toLocaleString()}</span></div>
+                <Button type="submit" className="bg-primary hover:bg-primary/90 text-white h-11 px-8 text-sm font-black transition-all">Generate & Post Invoice</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'history' && (
+        <Card className="border border-border shadow-none rounded-xl overflow-hidden">
+          <CardHeader className="bg-white border-b flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg font-black">Invoice Logs Repository</CardTitle>
+              <CardDescription className="text-xs">Comprehensive history of all stock movements</CardDescription>
+            </div>
+            <div className="flex gap-4">
+               <div className="flex bg-muted p-1 rounded-lg">
+                  <Button variant={invoiceTypeFilter === 'all' ? 'secondary' : 'ghost'} size="sm" onClick={() => setInvoiceTypeFilter('all')} className="h-7 text-[10px]">All</Button>
+                  <Button variant={invoiceTypeFilter === 'purchase' ? 'secondary' : 'ghost'} size="sm" onClick={() => setInvoiceTypeFilter('purchase')} className="h-7 text-[10px]">Purchases</Button>
+                  <Button variant={invoiceTypeFilter === 'sale' ? 'secondary' : 'ghost'} size="sm" onClick={() => setInvoiceTypeFilter('sale')} className="h-7 text-[10px]">Sales</Button>
+               </div>
+               <div className="relative w-48 no-print">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input placeholder="Search invoice..." className="pl-8 h-8 text-[10px]" />
+               </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-background text-muted-foreground font-bold border-b border-border">
+                  <tr>
+                    <th className="px-6 py-4">Inv ID</th>
+                    <th className="px-6 py-4">Date</th>
+                    <th className="px-6 py-4">Type</th>
+                    <th className="px-6 py-4">Entity</th>
+                    <th className="px-6 py-4">Total Amount</th>
+                    <th className="px-6 py-4">Paid</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredInvoices.length > 0 ? [...filteredInvoices].reverse().map(inv => (
+                    <tr key={inv.id} className="hover:bg-background transition-colors">
+                      <td className="px-6 py-4 font-mono font-bold text-accent">{inv.id}</td>
+                      <td className="px-6 py-4 text-muted-foreground text-[10px]">{inv.date}</td>
+                      <td className="px-6 py-4">
+                        <Badge className={inv.type === 'purchase' ? 'bg-amber-100 text-amber-700' : 'bg-primary/10 text-primary'}>{inv.type.toUpperCase()}</Badge>
+                      </td>
+                      <td className="px-6 py-4 font-bold">{inv.vendorName || students.find(s => s.id === inv.studentId)?.name}</td>
+                      <td className="px-6 py-4 font-black text-foreground">Rs.{inv.totalAmount.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-emerald-600 font-bold">Rs.{inv.amountPaid?.toLocaleString() || 0}</td>
+                      <td className="px-6 py-4">
+                        <Badge variant="outline" className={inv.paymentStatus === 'paid' ? 'border-emerald-500 text-emerald-600' : inv.paymentStatus === 'partial' ? 'border-amber-500 text-amber-600' : 'border-red-500 text-red-600'}>
+                          {inv.paymentStatus?.toUpperCase()}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex justify-end gap-2">
+                           {inv.paymentStatus !== 'paid' && (
+                             <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50" title="Record Balance Payment" onClick={() => setPaymentBalanceRecord({ invoiceId: inv.id, amount: '' })}>
+                               <Plus size={14} />
+                             </Button>
+                           )}
+                           <Button variant="ghost" size="icon" className="h-7 w-7 text-indigo-600 hover:bg-indigo-50" onClick={() => {
+                             // Print individual invoice logic...
+                             const printWindow = window.open('', '_blank');
+                             if (printWindow) {
+                                printWindow.document.write(`
+                                  <html>
+                                    <head><title>Invoice ${inv.id}</title><style>body{font-family:sans-serif;padding:30px;} .header{text-align:center;border-bottom:2px solid #333;margin-bottom:20px;padding-bottom:15px;} .table{width:100%;border-collapse:collapse;} .table th,.table td{border:1px solid #ddd;padding:10px;text-align:left;}</style></head>
+                                    <body onload="window.print();">
+                                      <div class="header"><h1>Al-Naseeha School</h1><p>Invoice #: ${inv.id}</p><p>Date: ${inv.date}</p></div>
+                                      <table class="table">
+                                        <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead>
+                                        <tbody>${inv.items.map(i => `<tr><td>${i.name}</td><td>${i.quantity}</td><td>${i.unitPrice}</td><td>${i.subtotal}</td></tr>`).join('')}</tbody>
+                                      </table>
+                                      <h3 style="text-align:right;">Total: Rs.${inv.totalAmount.toLocaleString()}</h3>
+                                    </body>
+                                  </html>
+                                `);
+                                printWindow.document.close();
+                             }
+                           }}><Printer size={14} /></Button>
+                           <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={() => onDeleteInvoice(inv.id)}><Trash2 size={14} /></Button>
+                        </div>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan={6} className="p-10 text-center italic text-muted-foreground">No invoices recorded yet</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'vendorledger' && (
+        <div className="space-y-6">
+          <Card className="border border-border shadow-none rounded-xl overflow-hidden">
+             <CardHeader className="bg-white border-b flex flex-row items-center justify-between">
+                <div>
+                   <CardTitle className="text-lg font-black">Vendor Ledger Statement</CardTitle>
+                   <CardDescription className="text-xs">Track real-time balances, purchases, and payments per vendor</CardDescription>
+                </div>
+                <div className="flex gap-3">
+                   <div className="w-64">
+                      <Select value={selectedVendor} onValueChange={setSelectedVendor}>
+                         <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select Vendor" /></SelectTrigger>
+                         <SelectContent>
+                            {vendors.map(v => <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>)}
+                         </SelectContent>
+                      </Select>
+                   </div>
+                   <Dialog open={showAddPayment} onOpenChange={setShowAddPayment}>
+                      <DialogTrigger render={
+                         <Button disabled={!selectedVendor} className="bg-primary hover:bg-primary/90 text-white h-9 text-xs px-4">Record Payment</Button>
+                      } />
+                      <DialogContent>
+                         <DialogHeader><DialogTitle>New Vendor Payment</DialogTitle></DialogHeader>
+                         <form onSubmit={handleAddPayment} className="space-y-4 pt-4">
+                            <div className="space-y-2">
+                               <Label className="text-xs">Selected Vendor</Label>
+                               <Input value={selectedVendor} disabled className="bg-muted" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                               <div className="space-y-2">
+                                  <Label className="text-xs">Payment Amount</Label>
+                                  <Input type="number" value={paymentForm.amount} onChange={e => setPaymentForm({...paymentForm, amount: e.target.value})} required placeholder="0.00" />
+                               </div>
+                               <div className="space-y-2">
+                                  <Label className="text-xs">Payment Date</Label>
+                                  <Input type="date" value={paymentForm.date} onChange={e => setPaymentForm({...paymentForm, date: e.target.value})} />
+                               </div>
+                            </div>
+                            <div className="space-y-2">
+                               <Label className="text-xs">Payment Description</Label>
+                               <Input value={paymentForm.description} onChange={e => setPaymentForm({...paymentForm, description: e.target.value})} placeholder="e.g. Bank Transfer Ref #123" />
+                            </div>
+                            <DialogFooter className="pt-4">
+                               <Button type="submit" className="w-full bg-primary text-white">Post Payment</Button>
+                            </DialogFooter>
+                         </form>
+                      </DialogContent>
+                   </Dialog>
+                </div>
+             </CardHeader>
+
+             {vendorData ? (
+               <CardContent className="p-0">
+                  <div className="bg-muted/30 p-6 flex justify-between border-b">
+                     <div className="space-y-1">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Vendor Details</p>
+                        <h4 className="font-black text-xl">{vendorData.name}</h4>
+                        <p className="text-xs text-muted-foreground">{vendorData.contact}</p>
+                     </div>
+                     <div className="text-right space-y-1">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Current Payable Balance</p>
+                        <h4 className={`text-2xl font-black ${vendorBalance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>Rs.{vendorBalance.toLocaleString()}</h4>
+                        <div className="flex items-center gap-2">
+                          <p className="text-[10px] italic text-muted-foreground truncate">Incl. Opening Balance: Rs.{vendorData.openingBalance.toLocaleString()}</p>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-5 w-5 text-muted-foreground hover:text-primary" 
+                            onClick={() => setEditingVendor(vendorData)}
+                          >
+                            <Edit size={10} />
+                          </Button>
+                        </div>
+                     </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-background text-muted-foreground font-bold border-b border-border">
+                        <tr>
+                          <th className="px-6 py-4">Date</th>
+                          <th className="px-6 py-4">Details</th>
+                          <th className="px-6 py-4">Debit (+Payable)</th>
+                          <th className="px-6 py-4 text-emerald-600">Credit (-Payment)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        <tr className="bg-muted/10 font-bold italic">
+                           <td className="px-6 py-3">---</td>
+                           <td className="px-6 py-3">Opening Balance</td>
+                           <td className="px-6 py-3">Rs.{vendorData.openingBalance.toLocaleString()}</td>
+                           <td className="px-6 py-3 text-emerald-600">Rs.0</td>
+                        </tr>
+                        {vendorTransactions.map((t, idx) => (
+                          <tr key={idx} className="hover:bg-background transition-colors">
+                            <td className="px-6 py-4 text-muted-foreground">{t.date}</td>
+                            <td className="px-6 py-4 font-bold">{t.description}</td>
+                            <td className="px-6 py-4 font-black">Rs.{t.debit.toLocaleString()}</td>
+                            <td className="px-6 py-4 font-black text-emerald-600">Rs.{t.credit.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+               </CardContent>
+             ) : (
+               <CardContent className="p-10 text-center italic text-muted-foreground">Select a vendor to view ledger</CardContent>
+             )}
+          </Card>
+          
+          {vendorData && (
+             <div className="flex justify-end no-print">
+               <Button onClick={() => window.print()} variant="outline" className="h-10 text-xs border-primary text-primary font-bold"><Printer size={16} className="mr-2" /> Print Vendor Statement</Button>
+             </div>
+          )}
+        </div>
+      )}
+      {activeTab === 'report' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+             <Card className="bg-white border text-center p-6 shadow-none rounded-xl"><p className="text-[10px] font-bold text-muted-foreground uppercase">Total Purchase Demand</p><h3 className="text-2xl font-black text-rose-600">Rs.{purchaseTotal.toLocaleString()}</h3></Card>
+             <Card className="bg-white border text-center p-6 shadow-none rounded-xl"><p className="text-[10px] font-bold text-muted-foreground uppercase">Total Sales Generated</p><h3 className="text-2xl font-black text-emerald-600">Rs.{saleTotal.toLocaleString()}</h3></Card>
+             <Card className={`text-center p-6 text-white border-none shadow-none rounded-xl ${grossProfit >= 0 ? 'bg-primary' : 'bg-red-700'}`}><p className="text-[10px] font-bold text-white/70 uppercase">Net Inventory Outcome</p><h3 className="text-2xl font-black">Rs.{Math.abs(grossProfit).toLocaleString()}</h3></Card>
+          </div>
+          <Card className="border border-border shadow-none rounded-xl overflow-hidden">
+             <CardHeader className="border-b bg-muted/20"><CardTitle className="text-sm font-black uppercase tracking-widest">Inventory Expense Analysis (Shipping/Fare)</CardTitle></CardHeader>
+             <CardContent className="p-0">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-background font-bold border-b text-muted-foreground">
+                    <tr><th className="px-6 py-4">Invoice ID</th><th className="px-6 py-4">Expense Reason</th><th className="px-6 py-4 text-right">Expense Amount</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {invoices.filter(i => (i.extraExpense || 0) > 0).map(i => (
+                       <tr key={i.id} className="hover:bg-background transition-colors"><td className="px-6 py-4 font-bold text-accent">{i.id}</td><td className="px-6 py-4 text-muted-foreground">{i.extraExpenseReason}</td><td className="px-6 py-4 text-right font-black text-foreground">Rs.{i.extraExpense?.toLocaleString()}</td></tr>
+                    ))}
+                    {invoices.filter(i => (i.extraExpense || 0) > 0).length === 0 && (
+                      <tr><td colSpan={3} className="p-6 text-center italic text-muted-foreground">No extra expenses recorded.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+             </CardContent>
+          </Card>
+          
+          <div className="pt-4 flex justify-end no-print">
+             <Button onClick={() => window.print()} variant="outline" className="h-10 text-xs border-primary text-primary font-bold"><Printer size={16} className="mr-2" /> Print Inventory Statement</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Recording Remaining Payment */}
+      <Dialog open={!!paymentBalanceRecord} onOpenChange={(open) => !open && setPaymentBalanceRecord(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Remaining Payment</DialogTitle>
+            <DialogDescription className="text-xs">
+              Posting payment to settle balance for Invoice #{paymentBalanceRecord?.invoiceId}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold">Amount to Pay</Label>
+              <Input 
+                type="number" 
+                value={paymentBalanceRecord?.amount || ''} 
+                onChange={e => setPaymentBalanceRecord(prev => prev ? { ...prev, amount: e.target.value } : null)}
+                placeholder="Enter amount..."
+                className="h-10 text-sm"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Total unpaid for this invoice: Rs.{(() => {
+                  const inv = invoices.find(i => i.id === paymentBalanceRecord?.invoiceId);
+                  return inv ? (inv.totalAmount - inv.amountPaid).toLocaleString() : '0';
+                })()}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentBalanceRecord(null)}>Cancel</Button>
+            <Button 
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => {
+                if (!paymentBalanceRecord) return;
+                const inv = invoices.find(i => i.id === paymentBalanceRecord.invoiceId);
+                if (!inv) return;
+                const payAmount = Number(paymentBalanceRecord.amount);
+                const updatedInv: InventoryInvoice = {
+                  ...inv,
+                  amountPaid: inv.amountPaid + payAmount,
+                  paymentStatus: (inv.amountPaid + payAmount) >= inv.totalAmount ? 'paid' : 'partial'
+                };
+                onUpdateInvoice(updatedInv, payAmount);
+                setPaymentBalanceRecord(null);
+              }}
+            >
+              Post Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal for Editing Vendor Details */}
+      <Dialog open={!!editingVendor} onOpenChange={(open) => !open && setEditingVendor(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Vendor Details</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold">Vendor Name</Label>
+              <Input value={editingVendor?.name || ''} disabled className="bg-muted opacity-50" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold">Contact Info</Label>
+              <Input 
+                value={editingVendor?.contact || ''} 
+                onChange={e => setEditingVendor(prev => prev ? { ...prev, contact: e.target.value } : null)}
+                className="h-10 text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold">Opening Balance (Payable)</Label>
+              <Input 
+                type="number" 
+                value={editingVendor?.openingBalance || 0} 
+                onChange={e => setEditingVendor(prev => prev ? { ...prev, openingBalance: Number(e.target.value) } : null)}
+                className="h-10 text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingVendor(null)}>Cancel</Button>
+            <Button 
+              className="bg-primary text-white"
+              onClick={() => {
+                if (editingVendor) {
+                  onUpdateVendor(editingVendor);
+                  setEditingVendor(null);
+                }
+              }}
+            >
+              Save Changes
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

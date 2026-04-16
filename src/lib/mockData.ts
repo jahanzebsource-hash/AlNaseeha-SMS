@@ -1,4 +1,4 @@
-import { Student, Teacher, Attendance, FeeRecord, ExamResult, Announcement, FinanceTransaction } from '../types';
+import { Student, Teacher, Attendance, FeeRecord, ExamResult, Announcement, FinanceTransaction, InventoryItem, Vendor, VendorPayment } from '../types';
 
 export const mockStudents: Student[] = [
   {
@@ -79,3 +79,17 @@ export const mockFees: FeeRecord[] = [
 ];
 
 export const mockTransactions: FinanceTransaction[] = [];
+
+export const mockInventory: InventoryItem[] = [
+  { id: 'i1', name: 'Biology Book Class 9', category: 'Books', purchasePrice: 250, salePrice: 300, stockQuantity: 50 },
+  { id: 'i2', name: 'Mathematics Book Class 10', category: 'Books', purchasePrice: 300, salePrice: 350, stockQuantity: 40 },
+  { id: 'i3', name: 'School Copy (Single Line)', category: 'Copies', purchasePrice: 40, salePrice: 60, stockQuantity: 100 },
+  { id: 'i4', name: 'School Badge', category: 'Uniform', purchasePrice: 20, salePrice: 40, stockQuantity: 200 }
+];
+
+export const mockVendors: Vendor[] = [
+  { id: 'v1', name: 'ABC Books Distributor', contact: '0300-1112223', openingBalance: 5000 },
+  { id: 'v2', name: 'Quality Stationery Mart', contact: '0321-4445556', openingBalance: 0 }
+];
+
+export const mockVendorPayments: VendorPayment[] = [];
