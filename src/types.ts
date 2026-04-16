@@ -138,10 +138,12 @@ export interface InventoryInvoice {
   type: 'purchase' | 'sale';
   date: string;
   studentId?: string;
+  studentName?: string;
   vendorName?: string;
   items: InvoiceItem[];
   extraExpense?: number;
   extraExpenseReason?: string;
+  specialDiscount?: number; // Flat Amount
   totalAmount: number;
   amountPaid: number;
   paymentStatus: 'paid' | 'partial' | 'unpaid';
@@ -153,6 +155,7 @@ export interface Vendor {
   id: string;
   name: string;
   contact: string;
+  address?: string;
   openingBalance: number;
 }
 
