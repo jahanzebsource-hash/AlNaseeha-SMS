@@ -12,6 +12,8 @@ export const mockStudents: Student[] = [
     parentName: 'Ahmed Khan',
     parentContact: '0300-1234567',
     address: 'Lahore, Pakistan',
+    dateOfBirth: '2008-05-15',
+    monthlyFee: 5000,
     createdAt: new Date().toISOString(),
   },
   {
@@ -25,6 +27,8 @@ export const mockStudents: Student[] = [
     parentName: 'Ahmed Ali',
     parentContact: '0300-7654321',
     address: 'Karachi, Pakistan',
+    dateOfBirth: '2009-02-10',
+    monthlyFee: 5500,
     createdAt: new Date().toISOString(),
   }
 ];
@@ -39,6 +43,8 @@ export const mockTeachers: Teacher[] = [
     subject: 'Mathematics',
     qualification: 'PhD in Mathematics',
     contactNumber: '0321-1112223',
+    baseSalary: 45000,
+    designation: 'Senior Teacher',
     createdAt: new Date().toISOString(),
   }
 ];

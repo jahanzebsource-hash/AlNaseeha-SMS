@@ -110,4 +110,33 @@
   html {
     @apply font-sans;
     }
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+    .print-only {
+      display: block !important;
+    }
+    body {
+      background: white !important;
+      color: black !important;
+    }
+    .salary-slip-container {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+      padding: 10px;
+    }
+    .salary-slip {
+      border: 1px dashed #ccc;
+      padding: 15px;
+      page-break-inside: avoid;
+      height: 30%;
+      margin-bottom: 20px;
+    }
+  }
+}
+
+.print-only {
+  display: none;
 }

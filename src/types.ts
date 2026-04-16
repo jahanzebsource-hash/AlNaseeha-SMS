@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'teacher' | 'student';
+export type UserRole = 'admin' | 'teacher' | 'student' | 'staff';
 
 export interface UserProfile {
   id: string;
@@ -17,14 +17,31 @@ export interface Student extends UserProfile {
   parentName: string;
   parentContact: string;
   address: string;
+  dateOfBirth: string;
+  monthlyFee: number;
 }
 
 export interface Teacher extends UserProfile {
-  role: 'teacher';
+  role: 'teacher' | 'staff';
   employeeId: string;
-  subject: string;
+  subject?: string;
   qualification: string;
   contactNumber: string;
+  baseSalary: number;
+  designation: string;
+}
+
+export interface PayrollRecord {
+  id: string;
+  employeeId: string;
+  month: string;
+  year: number;
+  baseSalary: number;
+  bonus: number;
+  deductions: number;
+  netSalary: number;
+  status: 'paid' | 'pending';
+  paymentDate?: string;
 }
 
 export interface Attendance {

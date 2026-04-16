@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   LayoutDashboard, 
   Users, 
@@ -17,7 +17,10 @@ import {
   X,
   LogOut,
   Search,
-  Plus
+  Plus,
+  Filter,
+  Printer,
+  DollarSign
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -35,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Student, Teacher, PayrollRecord } from './types';
 import { 
   mockStudents, 
   mockTeachers, 
@@ -48,6 +52,13 @@ type View = 'dashboard' | 'students' | 'teachers' | 'attendance' | 'fees' | 'exa
 export default function App() {
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [students, setStudents] = useState<Student[]>(mockStudents);
+  const [teachers, setTeachers] = useState<Teacher[]>(mockTeachers);
+  const [payroll, setPayroll] = useState<PayrollRecord[]>([]);
+
+  const totalMonthlyFee = useMemo(() => {
+    return students.reduce((sum, student) => sum + student.monthlyFee, 0);
+  }, [students]);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -62,21 +73,28 @@ export default function App() {
   const renderView = () => {
     switch (activeView) {
       case 'dashboard':
-        return <DashboardView />;
+        return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} />;
       case 'students':
-        return <StudentsView />;
+        return <StudentsView students={students} onAddStudent={(s) => setStudents([...students, s])} />;
       case 'teachers':
-        return <TeachersView />;
+        return (
+          <TeachersView 
+            teachers={teachers} 
+            payroll={payroll}
+            onAddTeacher={(t) => setTeachers([...teachers, t])}
+            onGeneratePayroll={(p) => setPayroll([...payroll, p])}
+          />
+        );
       case 'attendance':
-        return <AttendanceView />;
+        return <AttendanceView students={students} />;
       case 'fees':
-        return <FeesView />;
+        return <FeesView students={students} />;
       case 'exams':
-        return <ExamsView />;
+        return <ExamsView students={students} />;
       case 'announcements':
         return <AnnouncementsView />;
       default:
-        return <DashboardView />;
+        return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} />;
     }
   };
 
@@ -183,11 +201,11 @@ export default function App() {
   );
 }
 
-function DashboardView() {
+function DashboardView({ totalMonthlyFee, recentStudents }: { totalMonthlyFee: number, recentStudents: Student[] }) {
   const stats = [
-    { label: 'Total Students', value: '1,248', delta: '+24 this month', icon: Users, color: 'text-blue-600' },
+    { label: 'Total Students', value: recentStudents.length.toString(), delta: '+24 this month', icon: Users, color: 'text-blue-600' },
     { label: 'Active Teachers', value: '86', delta: '98% Attendance', icon: UserSquare2, color: 'text-emerald-600' },
-    { label: 'Monthly Revenue', value: '$42,850', delta: '85% Collected', icon: CreditCard, color: 'text-amber-600' },
+    { label: 'Monthly Income', value: `$${totalMonthlyFee.toLocaleString()}`, delta: 'Total Fee Demand', icon: CreditCard, color: 'text-amber-600' },
     { label: 'Daily Attendance', value: '94.2%', delta: 'Trending upwards', icon: CalendarCheck, color: 'text-purple-600' },
   ];
 
@@ -221,22 +239,17 @@ function DashboardView() {
                     <th className="px-6 py-3">Student Name</th>
                     <th className="px-6 py-3">Roll No</th>
                     <th className="px-6 py-3">Class</th>
-                    <th className="px-6 py-3">Date</th>
+                    <th className="px-6 py-3">Fee</th>
                     <th className="px-6 py-3">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {[
-                    { name: 'Arsalan Ahmed', id: '#ADM-2041', class: 'Grade 9-B', date: 'Oct 12, 2023' },
-                    { name: 'Fatima Zahra', id: '#ADM-2042', class: 'Grade 4-A', date: 'Oct 13, 2023' },
-                    { name: 'Zubair Khan', id: '#ADM-2043', class: 'Grade 11-C', date: 'Oct 14, 2023' },
-                    { name: 'Sara Malik', id: '#ADM-2044', class: 'Grade 2-A', date: 'Oct 14, 2023' },
-                  ].map((row, i) => (
+                  {recentStudents.map((row, i) => (
                     <tr key={i} className="hover:bg-background transition-colors">
                       <td className="px-6 py-3 font-medium text-foreground">{row.name}</td>
-                      <td className="px-6 py-3 text-muted-foreground">{row.id}</td>
-                      <td className="px-6 py-3 text-muted-foreground">{row.class}</td>
-                      <td className="px-6 py-3 text-muted-foreground">{row.date}</td>
+                      <td className="px-6 py-3 text-muted-foreground">#{row.rollNumber}</td>
+                      <td className="px-6 py-3 text-muted-foreground">{row.grade}</td>
+                      <td className="px-6 py-3 text-muted-foreground">${row.monthlyFee}</td>
                       <td className="px-6 py-3">
                         <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">Active</span>
                       </td>
@@ -287,19 +300,167 @@ function DashboardView() {
   );
 }
 
-function StudentsView() {
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+
+function StudentsView({ students, onAddStudent }: { students: Student[], onAddStudent: (s: Student) => void }) {
+  const [open, setOpen] = useState(false);
+  const [filterClass, setFilterClass] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredStudents = useMemo(() => {
+    return students.filter(s => {
+      const matchesClass = filterClass === 'all' || s.grade === filterClass;
+      const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          s.rollNumber.includes(searchQuery);
+      return matchesClass && matchesSearch;
+    });
+  }, [students, filterClass, searchQuery]);
+
+  const uniqueClasses = useMemo(() => {
+    const classes = new Set(students.map(s => s.grade));
+    return Array.from(classes);
+  }, [students]);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const [formData, setFormData] = useState({
+    name: '',
+    parentName: '',
+    dateOfBirth: '',
+    monthlyFee: '',
+    grade: '',
+    section: '',
+    rollNumber: '',
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newStudent: Student = {
+      id: Math.random().toString(36).substr(2, 9),
+      email: `${formData.name.toLowerCase().replace(/\s/g, '')}@school.com`,
+      role: 'student',
+      name: formData.name,
+      parentName: formData.parentName,
+      dateOfBirth: formData.dateOfBirth,
+      monthlyFee: Number(formData.monthlyFee),
+      grade: formData.grade,
+      section: formData.section,
+      rollNumber: formData.rollNumber,
+      parentContact: '',
+      address: '',
+      createdAt: new Date().toISOString(),
+    };
+    onAddStudent(newStudent);
+    setOpen(false);
+    setFormData({ name: '', parentName: '', dateOfBirth: '', monthlyFee: '', grade: '', section: '', rollNumber: '' });
+  };
+
   return (
-    <Card className="border border-border shadow-none rounded-xl overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-white">
-        <div>
-          <CardTitle className="text-lg font-bold">Student Directory</CardTitle>
-          <CardDescription className="text-xs">Manage and view all student records</CardDescription>
+    <div className="space-y-6">
+      <div className="no-print flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+          <Input 
+            placeholder="Search by name or roll number..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 h-10 text-xs border-border"
+          />
         </div>
-        <Button className="bg-accent hover:bg-accent/90 text-white h-9 text-xs">
-          <Plus size={16} className="mr-2" /> Add Student
+        <Select value={filterClass} onValueChange={setFilterClass}>
+          <SelectTrigger className="w-[180px] h-10 text-xs border-border">
+            <Filter size={14} className="mr-2" />
+            <SelectValue placeholder="Filter by Class" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Classes</SelectItem>
+            {uniqueClasses.map(c => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button variant="outline" onClick={handlePrint} className="h-10 text-xs border-border">
+          <Printer size={16} className="mr-2" /> Print List
         </Button>
+      </div>
+
+      <Card className="border border-border shadow-none rounded-xl overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-white no-print">
+          <div>
+            <CardTitle className="text-lg font-bold">Student Directory</CardTitle>
+            <CardDescription className="text-xs">
+              {filterClass === 'all' ? 'Showing all students' : `Showing Grade ${filterClass}`}
+            </CardDescription>
+          </div>
+          
+          <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger render={
+            <Button className="bg-accent hover:bg-accent/90 text-white h-9 text-xs">
+              <Plus size={16} className="mr-2" /> Admission Form
+            </Button>
+          } />
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>New Student Admission</DialogTitle>
+              <DialogDescription>
+                Enter the details for the new student enrollment.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right text-xs">Name</Label>
+                <Input id="name" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="col-span-3 h-8 text-xs" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="parent" className="text-right text-xs">Father Name</Label>
+                <Input id="parent" value={formData.parentName} onChange={(e) => setFormData({...formData, parentName: e.target.value})} className="col-span-3 h-8 text-xs" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="dob" className="text-right text-xs">D.O.B</Label>
+                <Input id="dob" type="date" value={formData.dateOfBirth} onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})} className="col-span-3 h-8 text-xs" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="fee" className="text-right text-xs">Monthly Fee</Label>
+                <Input id="fee" type="number" value={formData.monthlyFee} onChange={(e) => setFormData({...formData, monthlyFee: e.target.value})} className="col-span-3 h-8 text-xs" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="roll" className="text-right text-xs">Roll No</Label>
+                <Input id="roll" value={formData.rollNumber} onChange={(e) => setFormData({...formData, rollNumber: e.target.value})} className="col-span-3 h-8 text-xs" required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 items-center gap-2">
+                  <Label htmlFor="grade" className="text-right text-xs">Grade</Label>
+                  <Input id="grade" value={formData.grade} onChange={(e) => setFormData({...formData, grade: e.target.value})} className="h-8 text-xs" required />
+                </div>
+                <div className="grid grid-cols-2 items-center gap-2">
+                  <Label htmlFor="section" className="text-right text-xs">Sec</Label>
+                  <Input id="section" value={formData.section} onChange={(e) => setFormData({...formData, section: e.target.value})} className="h-8 text-xs" required />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="submit" className="bg-accent h-8 text-xs">Submit Admission</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </CardHeader>
       <CardContent className="p-0">
+        <div className="print-only mb-8 text-center p-6 border-b-2 border-primary">
+          <h1 className="text-3xl font-extrabold uppercase tracking-tighter text-primary">Al-Naseeha High School</h1>
+          <h2 className="text-xl font-bold mt-2">Student List - {filterClass === 'all' ? 'All Classes' : `Grade ${filterClass}`}</h2>
+          <p className="text-sm text-muted-foreground mt-1 text-center">Generated on: {new Date().toLocaleDateString()}</p>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="bg-background text-muted-foreground font-bold border-b border-border">
@@ -308,15 +469,15 @@ function StudentsView() {
                 <th className="px-6 py-4">Roll No</th>
                 <th className="px-6 py-4">Grade</th>
                 <th className="px-6 py-4">Parent Name</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Actions</th>
+                <th className="px-6 py-4">Fee</th>
+                <th className="px-6 py-4 no-print">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {mockStudents.map((student) => (
+              {filteredStudents.map((student) => (
                 <tr key={student.id} className="hover:bg-background transition-colors">
                   <td className="px-6 py-4 flex items-center gap-3">
-                    <Avatar className="h-7 w-7">
+                    <Avatar className="h-7 w-7 no-print">
                       <AvatarFallback className="text-[10px]">{student.name.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <span className="font-semibold text-foreground">{student.name}</span>
@@ -324,10 +485,8 @@ function StudentsView() {
                   <td className="px-6 py-4 text-muted-foreground">{student.rollNumber}</td>
                   <td className="px-6 py-4 text-muted-foreground">{student.grade} - {student.section}</td>
                   <td className="px-6 py-4 text-muted-foreground">{student.parentName}</td>
-                  <td className="px-6 py-4">
-                    <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">Active</span>
-                  </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 text-muted-foreground font-bold">${student.monthlyFee}</td>
+                  <td className="px-6 py-4 no-print">
                     <Button variant="ghost" size="sm" className="text-accent hover:text-accent/80 hover:bg-accent/10 text-[11px] h-7">Edit</Button>
                   </td>
                 </tr>
@@ -336,65 +495,306 @@ function StudentsView() {
           </table>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }
 
-function TeachersView() {
-  return (
-    <Card className="border border-border shadow-none rounded-xl">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="text-lg font-bold">Faculty Members</CardTitle>
-          <CardDescription className="text-xs">Manage teaching staff and assignments</CardDescription>
+function TeachersView({ 
+  teachers, 
+  payroll, 
+  onAddTeacher, 
+  onGeneratePayroll 
+}: { 
+  teachers: Teacher[], 
+  payroll: PayrollRecord[],
+  onAddTeacher: (t: Teacher) => void,
+  onGeneratePayroll: (p: PayrollRecord) => void
+}) {
+  const [view, setView] = useState<'staff' | 'payroll'>('staff');
+  const [openPayroll, setOpenPayroll] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<Teacher | null>(null);
+  const [payrollForm, setPayrollForm] = useState({
+    bonus: '0',
+    deductions: '0',
+    month: 'May',
+  });
+
+  const handleGeneratePayroll = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStaff) return;
+    
+    const bonus = Number(payrollForm.bonus);
+    const deductions = Number(payrollForm.deductions);
+    const netSalary = selectedStaff.baseSalary + bonus - deductions;
+
+    const newRecord: PayrollRecord = {
+      id: Math.random().toString(36).substr(2, 9),
+      employeeId: selectedStaff.employeeId,
+      month: payrollForm.month,
+      year: 2024,
+      baseSalary: selectedStaff.baseSalary,
+      bonus,
+      deductions,
+      netSalary,
+      status: 'paid',
+      paymentDate: new Date().toISOString().split('T')[0],
+    };
+
+    onGeneratePayroll(newRecord);
+    setOpenPayroll(false);
+    setPayrollForm({ bonus: '0', deductions: '0', month: 'May' });
+  };
+
+  const handlePrintSalarySlips = (employeeId?: string) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const relevantPayroll = employeeId 
+      ? payroll.filter(p => p.employeeId === employeeId)
+      : payroll;
+
+    const slipsHtml = relevantPayroll.map(p => {
+      const staff = teachers.find(t => t.employeeId === p.employeeId);
+      return `
+        <div class="salary-slip">
+          <div style="text-align:center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
+            <h2 style="margin:0;">Al-Naseeha High School</h2>
+            <p style="margin:5px 0;">Salary Slip - ${p.month} ${p.year}</p>
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:12px;">
+            <div><strong>Staff Name:</strong> ${staff?.name}</div>
+            <div><strong>Employee ID:</strong> ${p.employeeId}</div>
+            <div><strong>Designation:</strong> ${staff?.designation}</div>
+            <div><strong>Payment Date:</strong> ${p.paymentDate}</div>
+          </div>
+          <div style="margin-top:20px; border:1px solid #ccc;">
+            <div style="display:grid; grid-template-columns: 2fr 1fr; border-bottom:1px solid #ccc; background:#f9f9f9; padding:5px; font-weight:bold;">
+              <span>Earnings</span><span>Amount</span>
+            </div>
+            <div style="display:grid; grid-template-columns: 2fr 1fr; border-bottom:1px solid #eee; padding:5px;">
+              <span>Base Salary</span><span>$${p.baseSalary}</span>
+            </div>
+            <div style="display:grid; grid-template-columns: 2fr 1fr; border-bottom:1px solid #eee; padding:5px;">
+              <span>Bonus</span><span>$${p.bonus}</span>
+            </div>
+            <div style="display:grid; grid-template-columns: 2fr 1fr; background:#f9f9f9; padding:5px; font-weight:bold;">
+              <span>Deductions</span><span>-$${p.deductions}</span>
+            </div>
+          </div>
+          <div style="margin-top:15px; text-align:right; font-size:16px; font-weight:bold; color:#1e293b;">
+            Net Salary: $${p.netSalary}
+          </div>
+          <div style="margin-top:30px; display:flex; justify-content:space-between; font-size:10px;">
+            <div style="border-top:1px solid #000; padding-top:5px; width:120px; text-align:center;">Employee Signature</div>
+            <div style="border-top:1px solid #000; padding-top:5px; width:120px; text-align:center;">Authorized Signature</div>
+          </div>
         </div>
-        <Button className="bg-accent hover:bg-accent/90 text-white h-9 text-xs">
-          <Plus size={16} className="mr-2" /> Add Teacher
-        </Button>
-      </CardHeader>
-      <CardContent>
+      `;
+    }).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Salary Slips</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; }
+            .salary-slip { border: 1px dashed #666; padding: 20px; margin-bottom: 20px; height: 300px; page-break-inside: avoid; }
+            @media print { .salary-slip { border: 1px dashed #000; } }
+          </style>
+        </head>
+        <body onload="window.print(); window.close();">
+          ${slipsHtml}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center mb-6 no-print">
+        <div className="flex bg-muted p-1 rounded-lg">
+          <Button 
+            variant={view === 'staff' ? 'default' : 'ghost'} 
+            onClick={() => setView('staff')}
+            className="text-xs h-8 px-4"
+          >Staff Management</Button>
+          <Button 
+            variant={view === 'payroll' ? 'default' : 'ghost'} 
+            onClick={() => setView('payroll')}
+            className="text-xs h-8 px-4"
+          >Payroll & Salary</Button>
+        </div>
+        <div>
+          {view === 'staff' ? (
+            <Button className="bg-accent text-white h-9 text-xs">
+              <Plus size={16} className="mr-2" /> Add Staff Member
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => handlePrintSalarySlips()} className="h-9 text-xs border-border">
+              <Printer size={16} className="mr-1" /> Print All Slips (A4)
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {view === 'staff' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {mockTeachers.map((teacher) => (
-            <Card key={teacher.id} className="bg-background border border-border shadow-none rounded-xl">
+          {teachers.map((teacher) => (
+            <Card key={teacher.id} className="bg-background border border-border shadow-none rounded-xl overflow-hidden hover:border-accent transition-all group">
               <CardContent className="p-6">
                 <div className="flex items-center gap-4 mb-4">
-                  <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
-                    <AvatarFallback className="bg-accent text-white">{teacher.name.charAt(0)}</AvatarFallback>
+                  <Avatar className="h-12 w-12 border-2 border-white shadow-sm ring-2 ring-accent/10">
+                    <AvatarFallback className="bg-accent text-white font-bold">{teacher.name.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <h4 className="font-bold text-foreground">{teacher.name}</h4>
-                    <p className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider">{teacher.subject}</p>
+                    <h4 className="font-bold text-primary group-hover:text-accent transition-colors">{teacher.name}</h4>
+                    <p className="text-[10px] text-accent font-extrabold uppercase tracking-widest">{teacher.designation}</p>
                   </div>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Employee ID:</span>
-                    <span className="font-bold text-foreground">{teacher.employeeId}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Qualification:</span>
-                    <span className="font-bold text-foreground">{teacher.qualification}</span>
+                    <span className="font-bold">{teacher.employeeId}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Contact:</span>
-                    <span className="font-bold text-foreground">{teacher.contactNumber}</span>
+                    <span className="font-bold">{teacher.contactNumber}</span>
+                  </div>
+                  <div className="flex justify-between bg-emerald-50 p-2 rounded-md border border-emerald-100 mt-2">
+                    <span className="text-emerald-700 font-medium">Base Salary:</span>
+                    <span className="font-extrabold text-emerald-800">${teacher.baseSalary?.toLocaleString()}</span>
                   </div>
                 </div>
-                <Separator className="my-4 bg-border" />
+                <Separator className="my-4 bg-border/50" />
                 <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 text-[11px] h-8 border-border hover:bg-accent hover:text-white"
+                    onClick={() => {
+                      setSelectedStaff(teacher);
+                      setOpenPayroll(true);
+                    }}
+                  >
+                    <DollarSign size={14} className="mr-1" /> Payroll
+                  </Button>
                   <Button variant="outline" size="sm" className="flex-1 text-[11px] h-8 border-border">Profile</Button>
-                  <Button variant="outline" size="sm" className="flex-1 text-[11px] h-8 border-border">Schedule</Button>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
-      </CardContent>
-    </Card>
+      ) : (
+        <Card className="border border-border shadow-none rounded-xl overflow-hidden">
+          <CardHeader className="border-b border-border bg-white">
+            <CardTitle className="text-lg font-bold">Payroll History</CardTitle>
+            <CardDescription className="text-xs">Review generated payroll and print salary slips</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-background text-muted-foreground font-bold border-b border-border">
+                <tr>
+                  <th className="px-6 py-4">Employee</th>
+                  <th className="px-6 py-4">Month/Year</th>
+                  <th className="px-6 py-4">Base Salary</th>
+                  <th className="px-6 py-4">Net Salary</th>
+                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {payroll.map((p) => {
+                  const staff = teachers.find(t => t.employeeId === p.employeeId);
+                  return (
+                    <tr key={p.id} className="hover:bg-background transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="font-bold">{staff?.name}</div>
+                        <div className="text-[10px] text-muted-foreground">{p.employeeId}</div>
+                      </td>
+                      <td className="px-6 py-4 text-muted-foreground">{p.month} {p.year}</td>
+                      <td className="px-6 py-4 text-muted-foreground font-medium">${p.baseSalary.toLocaleString()}</td>
+                      <td className="px-6 py-4 font-extrabold text-emerald-600">${p.netSalary.toLocaleString()}</td>
+                      <td className="px-6 py-4">
+                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">Paid</Badge>
+                      </td>
+                      <td className="px-6 py-4">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handlePrintSalarySlips(p.employeeId)}
+                          className="text-accent h-7 text-[11px] hover:bg-accent/10"
+                        >
+                          <Printer size={14} className="mr-1" /> Slip
+                        </Button>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {payroll.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground italic">No payroll records generated yet. Click 'Payroll' on a staff member to start.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Payroll Entry Dialog */}
+      <Dialog open={openPayroll} onOpenChange={setOpenPayroll}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Generate Salary Slip</DialogTitle>
+            <DialogDescription>
+              Enter adjustments for {selectedStaff?.name}'s salary
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleGeneratePayroll} className="space-y-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right text-xs">Base Salary</Label>
+              <Input value={`$${selectedStaff?.baseSalary}`} disabled className="col-span-3 h-9 text-xs bg-muted font-bold" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="bonus" className="text-right text-xs">Bonus</Label>
+              <Input id="bonus" type="number" value={payrollForm.bonus} onChange={(e) => setPayrollForm({...payrollForm, bonus: e.target.value})} className="col-span-3 h-9 text-xs" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="deduct" className="text-right text-xs">Deductions</Label>
+              <Input id="deduct" type="number" value={payrollForm.deductions} onChange={(e) => setPayrollForm({...payrollForm, deductions: e.target.value})} className="col-span-3 h-9 text-xs" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="month" className="text-right text-xs">Month</Label>
+              <Select value={payrollForm.month} onValueChange={(v) => setPayrollForm({...payrollForm, month: v})}>
+                <SelectTrigger className="col-span-3 h-9 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="pt-4 border-t border-border flex justify-between items-center text-sm">
+              <span className="font-bold text-muted-foreground">Net Payable:</span>
+              <span className="text-xl font-black text-emerald-600">
+                ${(selectedStaff?.baseSalary || 0) + Number(payrollForm.bonus) - Number(payrollForm.deductions)}
+              </span>
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="submit" className="bg-primary w-full h-10 text-xs font-bold uppercase tracking-wider">Generate Slip & Finalize</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 
-function AttendanceView() {
+function AttendanceView({ students }: { students: Student[] }) {
   return (
     <Card className="border border-border shadow-none rounded-xl overflow-hidden">
       <CardHeader className="border-b border-border bg-white">
@@ -421,7 +821,7 @@ function AttendanceView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {mockStudents.map((student) => {
+              {students.map((student) => {
                 const att = mockAttendance.find(a => a.studentId === student.id);
                 return (
                   <tr key={student.id} className="hover:bg-background transition-colors">
@@ -460,15 +860,16 @@ function AttendanceView() {
   );
 }
 
-function FeesView() {
+function FeesView({ students }: { students: Student[] }) {
+  const totalFees = students.reduce((sum, s) => sum + s.monthlyFee, 0);
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="border border-border shadow-none rounded-xl bg-primary text-white">
           <CardContent className="p-6">
-            <p className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-1">Total Collected</p>
-            <h3 className="text-3xl font-bold">$42,850</h3>
-            <p className="text-emerald-400 text-[11px] font-bold mt-2">+12% from last month</p>
+            <p className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-1">Total Fee Demand</p>
+            <h3 className="text-3xl font-bold">${totalFees.toLocaleString()}</h3>
+            <p className="text-emerald-400 text-[11px] font-bold mt-2">Current Monthly Total</p>
           </CardContent>
         </Card>
         <Card className="border border-border shadow-none rounded-xl bg-white">
@@ -509,13 +910,13 @@ function FeesView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {mockStudents.map((student) => {
+                {students.map((student) => {
                   const fee = mockFees.find(f => f.studentId === student.id);
                   return (
                     <tr key={student.id} className="hover:bg-background transition-colors">
                       <td className="px-6 py-4 font-bold text-foreground">{student.name}</td>
                       <td className="px-6 py-4 text-muted-foreground">{student.rollNumber}</td>
-                      <td className="px-6 py-4 text-muted-foreground">${fee?.amount || 500}</td>
+                      <td className="px-6 py-4 text-muted-foreground">${student.monthlyFee}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 rounded text-[10px] font-bold ${
                           fee?.status === 'paid' 
@@ -541,7 +942,7 @@ function FeesView() {
   );
 }
 
-function ExamsView() {
+function ExamsView({ students }: { students: Student[] }) {
   return (
     <Card className="border border-border shadow-none rounded-xl overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-white">
