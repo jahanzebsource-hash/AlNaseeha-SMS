@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'teacher' | 'student' | 'staff';
+export type UserRole = 'admin' | 'principal' | 'teacher' | 'accountant' | 'student' | 'staff';
 
 export interface UserProfile {
   id: string;
@@ -165,4 +165,21 @@ export interface VendorPayment {
   amount: number;
   date: string;
   description: string;
+}
+
+export interface TimetableEntry {
+  id: string;
+  grade: string;
+  day: string;
+  slotId: string; // Linking to TimetableSlot.id
+  subject: string;
+  teacherId: string;
+}
+
+export interface TimetableSlot {
+  id: string;
+  startTime: string;
+  endTime: string;
+  isBreak: boolean;
+  label: string; // e.g. "1st Period", "Break"
 }

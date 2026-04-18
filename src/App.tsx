@@ -77,8 +77,13 @@ import {
   InventoryInvoice,
   InvoiceItem,
   Vendor,
-  VendorPayment
+  VendorPayment,
+  TimetableSlot,
+  TimetableEntry,
+  UserProfile,
+  UserRole
 } from './types';
+import { authService, MOCK_USERS } from './services/authService';
 import { 
   mockStudents, 
   mockTeachers, 
@@ -91,7 +96,7 @@ import {
   mockVendorPayments
 } from './lib/mockData';
 
-type View = 'dashboard' | 'students' | 'teachers' | 'attendance' | 'fees' | 'exams' | 'announcements' | 'finance' | 'cashbook' | 'inventory';
+type View = 'dashboard' | 'students' | 'teachers' | 'attendance' | 'fees' | 'exams' | 'announcements' | 'finance' | 'cashbook' | 'inventory' | 'timetable';
 
 const SCHOOL_CLASSES = [
   'Play Group', 'Nursery', 'KG', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'
@@ -100,6 +105,7 @@ const SCHOOL_CLASSES = [
 const SCHOOL_LOGO = "https://i.ibb.co/vzN89vG/school-logo.png"; // Placeholder - User should replace with actual uploaded logo path
 
 export default function App() {
+  const [user, setUser] = useState<UserProfile | null>(authService.getCurrentUser());
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [students, setStudents] = useState<Student[]>(mockStudents);
@@ -113,25 +119,42 @@ export default function App() {
   const [invoices, setInvoices] = useState<InventoryInvoice[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>(mockVendors);
   const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>(mockVendorPayments);
+  const [timetableSlots, setTimetableSlots] = useState<TimetableSlot[]>([]);
+  const [timetableEntries, setTimetableEntries] = useState<TimetableEntry[]>([]);
 
   const totalMonthlyFee = useMemo(() => {
     return students.reduce((sum, student) => sum + student.monthlyFee, 0);
   }, [students]);
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'students', label: 'Student Management', icon: Users },
-    { id: 'teachers', label: 'Staff & Teachers', icon: UserSquare2 },
-    { id: 'attendance', label: 'Attendance System', icon: CalendarCheck },
-    { id: 'fees', label: 'Fee & Financials', icon: CreditCard },
-    { id: 'finance', label: 'Income & Expense', icon: Receipt },
-    { id: 'cashbook', label: 'Daily Cashbook', icon: Calculator },
-    { id: 'inventory', label: 'Inventory & Sale', icon: Package },
-    { id: 'exams', label: 'Examinations', icon: GraduationCap },
-    { id: 'announcements', label: 'Announcements', icon: Bell },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'principal', 'teacher', 'accountant'] },
+    { id: 'students', label: 'Student Management', icon: Users, roles: ['admin', 'principal'] },
+    { id: 'teachers', label: 'Staff & Teachers', icon: UserSquare2, roles: ['admin', 'principal'] },
+    { id: 'attendance', label: 'Attendance System', icon: CalendarCheck, roles: ['admin', 'principal', 'teacher'] },
+    { id: 'fees', label: 'Fee & Financials', icon: CreditCard, roles: ['admin', 'principal', 'accountant'] },
+    { id: 'finance', label: 'Income & Expense', icon: Receipt, roles: ['admin', 'principal', 'accountant'] },
+    { id: 'cashbook', label: 'Daily Cashbook', icon: Calculator, roles: ['admin', 'principal', 'accountant'] },
+    { id: 'inventory', label: 'Inventory & Sale', icon: Package, roles: ['admin', 'principal', 'accountant'] },
+    { id: 'timetable', label: 'Time Table', icon: BookOpen, roles: ['admin', 'principal', 'teacher', 'student'] },
+    { id: 'exams', label: 'Examinations', icon: GraduationCap, roles: ['admin', 'principal', 'teacher'] },
+    { id: 'announcements', label: 'Announcements', icon: Bell, roles: ['all'] },
   ];
 
+  const filteredNavItems = navItems.filter(item => 
+    !user || item.roles.includes('all') || item.roles.includes(user.role)
+  );
+
+  const handleLogout = () => {
+    authService.logout();
+    setUser(null);
+  };
+
   const renderView = () => {
+    if (user?.role === 'student') {
+      const studentData = students.find(s => s.email === user.email) || mockStudents[0];
+      return <StudentDashboardView student={studentData} />;
+    }
+
     switch (activeView) {
       case 'dashboard':
         return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} />;
@@ -261,6 +284,16 @@ export default function App() {
             onAddVendor={(vendor) => setVendors(prev => [...prev, vendor])}
           />
         );
+      case 'timetable':
+        return (
+          <TimetableView 
+            teachers={teachers}
+            slots={timetableSlots}
+            entries={timetableEntries}
+            onUpdateSlots={setTimetableSlots}
+            onUpdateEntries={setTimetableEntries}
+          />
+        );
       case 'exams':
         return <ExamsView students={students} />;
       case 'announcements':
@@ -269,6 +302,10 @@ export default function App() {
         return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} />;
     }
   };
+
+  if (!user) {
+    return <LoginView onLogin={(user) => setUser(user)} />;
+  }
 
   return (
     <div className="min-h-screen bg-background flex font-sans">
@@ -312,7 +349,7 @@ export default function App() {
         </div>
 
         <nav className="flex-1 space-y-0 mt-4">
-          {navItems.map((item) => (
+          {filteredNavItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveView(item.id as View)}
@@ -337,7 +374,10 @@ export default function App() {
         </nav>
 
         <div className="p-4 border-t border-sidebar-border">
-          <button className="w-full flex items-center px-6 py-3 text-sidebar-foreground hover:text-red-400 hover:bg-sidebar-accent rounded-lg transition-colors">
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center px-6 py-3 text-sidebar-foreground hover:text-red-400 hover:bg-sidebar-accent rounded-lg transition-colors"
+          >
             <LogOut size={18} />
             {isSidebarOpen && <span className="ml-3 text-sm font-medium">Logout</span>}
           </button>
@@ -355,13 +395,63 @@ export default function App() {
             />
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-right hidden sm:block">
-              <div className="text-sm font-semibold text-foreground">Muhammad Jahanzeb</div>
-              <div className="text-[11px] text-muted-foreground">Principal | Session: 2023-24</div>
+            <div className="flex items-center gap-2 border-r border-border pr-4 no-print">
+               <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-[10px] font-bold text-accent uppercase tracking-widest gap-2">
+                    <UserSquare2 size={14} /> Switch Role
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2 bg-white border-border shadow-2xl rounded-xl">
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black text-muted-foreground uppercase px-2 py-1 tracking-widest">Select Demo Account</p>
+                    {MOCK_USERS.map(u => (
+                      <button
+                        key={u.id}
+                        onClick={() => {
+                          authService.login(u.email, '123');
+                          setUser(authService.getCurrentUser());
+                          setActiveView('dashboard');
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs font-bold text-foreground hover:bg-accent/5 hover:text-accent rounded-lg transition-colors flex items-center justify-between"
+                      >
+                        {u.name}
+                        <Badge variant="outline" className="text-[8px] uppercase px-1 h-4">{u.role}</Badge>
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
-            <Avatar className="h-8 w-8 bg-accent text-white font-bold text-xs">
-              <AvatarFallback className="bg-accent text-white">MJ</AvatarFallback>
-            </Avatar>
+
+            <div className="text-right hidden sm:block">
+              <div className="text-sm font-semibold text-foreground">{user?.name}</div>
+              <div className="text-[11px] text-muted-foreground uppercase">{user?.role} | Session: 2023-24</div>
+            </div>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Avatar className="h-8 w-8 bg-accent text-white font-bold text-xs cursor-pointer hover:opacity-80 transition-opacity">
+                  <AvatarFallback className="bg-accent text-white">
+                    {user?.name.split(' ').map(n => n[0]).join('')}
+                  </AvatarFallback>
+                </Avatar>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-2 bg-white border-border shadow-2xl rounded-xl">
+                <div className="space-y-1">
+                  <div className="px-3 py-2 border-bottom border-border mb-1">
+                    <p className="text-xs font-black text-foreground truncate">{user?.name}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{user?.email}</p>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <LogOut size={14} /> Logout Account
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </header>
 
@@ -614,11 +704,11 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
           </div>
           
           <Dialog open={open} onOpenChange={handleOpenChange}>
-          <DialogTrigger render={
-            <Button className="bg-accent hover:bg-accent/90 text-white h-9 text-xs">
+          <DialogTrigger render={(props) => (
+            <Button {...props} className="bg-accent hover:bg-accent/90 text-white h-9 text-xs">
               <Plus size={16} className="mr-2" /> Admission Form
             </Button>
-          } />
+          )} />
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>{editingStudent ? 'Edit Student Details' : 'New Student Admission'}</DialogTitle>
@@ -921,11 +1011,11 @@ function TeachersView({
         <div>
           {view === 'staff' ? (
             <Dialog open={openAddStaff} onOpenChange={setOpenAddStaff}>
-              <DialogTrigger render={
-                <Button className="bg-accent text-white h-9 text-xs">
+              <DialogTrigger render={(props) => (
+                <Button {...props} className="bg-accent text-white h-9 text-xs">
                   <Plus size={16} className="mr-2" /> Add Staff Member
                 </Button>
-              } />
+              )} />
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>Add New Staff Member</DialogTitle>
@@ -2130,6 +2220,428 @@ function FeesView({
   );
 }
 
+function TimetableView({ 
+  teachers, 
+  slots, 
+  entries, 
+  onUpdateSlots, 
+  onUpdateEntries 
+}: { 
+  teachers: Teacher[], 
+  slots: TimetableSlot[], 
+  entries: TimetableEntry[], 
+  onUpdateSlots: (s: TimetableSlot[]) => void, 
+  onUpdateEntries: (e: TimetableEntry[]) => void 
+}) {
+  const [selectedClass, setSelectedClass] = useState<string>(SCHOOL_CLASSES[0]);
+  const [editingEntry, setEditingEntry] = useState<{ day: string, slotId: string } | null>(null);
+  const [showConfig, setShowConfig] = useState(false);
+  
+  const [configForm, setConfigForm] = useState({
+    startTime: '08:00',
+    duration: 40,
+    periods: 8,
+    breakAfter: 4,
+    breakDuration: 30
+  });
+
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  const generateSlots = () => {
+    const newSlots: TimetableSlot[] = [];
+    let currentTime = configForm.startTime;
+
+    const addMinutes = (time: string, minutes: number) => {
+      const [hours, mins] = time.split(':').map(Number);
+      const totalMins = hours * 60 + mins + minutes;
+      const newHours = Math.floor(totalMins / 60) % 24;
+      const newMins = totalMins % 60;
+      return `${String(newHours).padStart(2, '0')}:${String(newMins).padStart(2, '0')}`;
+    };
+
+    for (let i = 1; i <= configForm.periods; i++) {
+      const endTime = addMinutes(currentTime, configForm.duration);
+      newSlots.push({
+        id: `period-${i}`,
+        startTime: currentTime,
+        endTime: endTime,
+        isBreak: false,
+        label: `${i}${i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th'} Period`
+      });
+      currentTime = endTime;
+
+      if (i === configForm.breakAfter) {
+        const breakEnd = addMinutes(currentTime, configForm.breakDuration);
+        newSlots.push({
+          id: `break-${i}`,
+          startTime: currentTime,
+          endTime: breakEnd,
+          isBreak: true,
+          label: 'Break / Recess'
+        });
+        currentTime = breakEnd;
+      }
+    }
+    onUpdateSlots(newSlots);
+    setShowConfig(false);
+  };
+
+  const handleAssign = (subject: string, teacherId: string) => {
+    if (!editingEntry) return;
+
+    const existingIndex = entries.findIndex(
+      e => e.grade === selectedClass && e.day === editingEntry.day && e.slotId === editingEntry.slotId
+    );
+
+    const newEntry: TimetableEntry = {
+      id: Math.random().toString(36).substr(2, 9),
+      grade: selectedClass,
+      day: editingEntry.day,
+      slotId: editingEntry.slotId,
+      subject,
+      teacherId
+    };
+
+    if (existingIndex > -1) {
+      const updated = [...entries];
+      updated[existingIndex] = newEntry;
+      onUpdateEntries(updated);
+    } else {
+      onUpdateEntries([...entries, newEntry]);
+    }
+    setEditingEntry(null);
+  };
+
+  const currentEntry = (day: string, slotId: string) => {
+    return entries.find(e => e.grade === selectedClass && e.day === day && e.slotId === slotId);
+  };
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const tableHtml = `
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; background: white; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 30px; }
+        .school-name { font-size: 28px; font-weight: 900; margin: 0; color: #0f172a; text-transform: uppercase; letter-spacing: -0.025em; }
+        .title { font-size: 18px; font-weight: 700; color: #64748b; margin: 5px 0 0 0; }
+        .logo { height: 50px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; table-layout: fixed; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: center; overflow: hidden; }
+        th { background: #f8fafc; font-size: 10px; font-weight: 900; text-transform: uppercase; color: #64748b; letter-spacing: 0.1em; }
+        .time-cell { width: 100px; background: #f8fafc; }
+        .time-label { font-size: 10px; font-weight: 900; color: #2563eb; text-transform: uppercase; margin-bottom: 2px; }
+        .time-range { font-size: 10px; color: #64748b; font-weight: 500; }
+        .subject { font-size: 12px; font-weight: 800; margin: 0; color: #0f172a; line-height: 1.2; }
+        .teacher { font-size: 10px; color: #64748b; margin: 4px 0 0 0; font-weight: 500; }
+        .recess-row { background-color: #fffbeb !important; }
+        .recess-text { font-size: 12px; font-weight: 900; color: #d97706; letter-spacing: 1em; text-transform: uppercase; }
+        .footer { margin-top: 60px; display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; border-top: 1px solid #f1f5f9; pt: 20px; }
+        @media print {
+          body { padding: 20px; }
+          .no-print { display: none; }
+          tr { page-break-inside: avoid; }
+        }
+      </style>
+      <div class="header">
+        <div>
+          <h1 class="school-name">The Smart School</h1>
+          <p class="title">${selectedClass} Class Timetable Schedule</p>
+        </div>
+        <div style="text-align: right;">
+          <img src="${SCHOOL_LOGO}" class="logo" />
+          <p style="margin: 8px 0 0 0; font-weight: 800; color: #1e293b; font-size: 12px;">ACADEMIC SESSION 2026-27</p>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="time-cell">Time / Period</th>
+            ${DAYS.map(day => `<th>${day}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${slots.map(slot => `
+            <tr class="${slot.isBreak ? 'recess-row' : ''}">
+              <td class="time-cell">
+                <div class="time-label">${slot.label}</div>
+                <div class="time-range">${slot.startTime} - ${slot.endTime}</div>
+              </td>
+              ${slot.isBreak ? 
+                `<td colspan="${DAYS.length}" class="recess-text">R E C E S S</td>` :
+                DAYS.map(day => {
+                  const entry = currentEntry(day, slot.id);
+                  const teacher = teachers.find(t => t.id === entry?.teacherId);
+                  return `
+                    <td>
+                      ${entry ? `
+                        <p class="subject">${entry.subject}</p>
+                        <p class="teacher">${teacher?.name || '-'}</p>
+                      ` : ''}
+                    </td>
+                  `;
+                }).join('')
+              }
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <div class="footer">
+        <p>This is a computer-generated document. Generated on ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+        <p>&copy; School Management System 2026</p>
+      </div>
+    `;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${selectedClass} Timetable</title>
+          <meta charset="UTF-8">
+        </head>
+        <body onload="setTimeout(() => { window.print(); window.close(); }, 500)">
+          ${tableHtml}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
+        <div className="flex items-center gap-4">
+          <Select value={selectedClass} onValueChange={setSelectedClass}>
+            <SelectTrigger className="w-48 h-10 border-accent text-accent font-bold">
+              <SelectValue placeholder="Select Class" />
+            </SelectTrigger>
+            <SelectContent>
+              {SCHOOL_CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button 
+            variant="outline" 
+            onClick={() => setShowConfig(true)}
+            className="border-primary text-primary hover:bg-primary/5 h-10 text-xs font-bold"
+          >
+            <Settings size={16} className="mr-2" /> Configure Slots
+          </Button>
+        </div>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handlePrint}
+            className="border-primary text-primary h-10 text-xs font-bold"
+          >
+            <Printer size={16} className="mr-2" /> Print Timetable
+          </Button>
+        </div>
+      </div>
+
+      <Card className="border border-border shadow-none rounded-xl overflow-hidden print:border-none print:shadow-none">
+        <CardHeader className="bg-white border-b print:pb-2">
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="text-xl font-black">{selectedClass} Timetable</CardTitle>
+              <CardDescription className="text-xs">Weekly academic schedule and teacher assignments</CardDescription>
+            </div>
+            <div className="hidden print:block text-right">
+              <img src={SCHOOL_LOGO} alt="School Logo" className="h-10 ml-auto mb-1" referrerPolicy="no-referrer" />
+              <p className="text-[10px] font-bold text-muted-foreground uppercase">Academic Session 2026-27</p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
+          {slots.length === 0 ? (
+            <div className="p-20 text-center space-y-4">
+              <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto text-primary">
+                <CalendarCheck size={32} />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold">No Time Slots Configured</h3>
+                <p className="text-muted-foreground text-sm max-w-xs mx-auto">Please configure your school timings and period structure to generate the timetable grid.</p>
+                <Button onClick={() => setShowConfig(true)} className="bg-primary text-white mt-4">Setup Now</Button>
+              </div>
+            </div>
+          ) : (
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="border-b border-r bg-muted/30 p-4 text-[10px] font-black uppercase text-muted-foreground w-32">Time / Period</th>
+                  {DAYS.map(day => (
+                    <th key={day} className="border-b border-r bg-muted/30 p-4 text-[10px] font-black uppercase text-muted-foreground text-center">
+                      {day}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {slots.map(slot => (
+                  <tr key={slot.id} className={slot.isBreak ? 'bg-amber-50/50' : ''}>
+                    <td className="border-b border-r p-3 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-primary">{slot.label}</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">{slot.startTime} - {slot.endTime}</p>
+                    </td>
+                    {DAYS.map(day => {
+                      const entry = currentEntry(day, slot.id);
+                      const teacher = teachers.find(t => t.id === entry?.teacherId);
+                      
+                      if (slot.isBreak) {
+                        return (
+                          <td key={day} className="border-b border-r p-3 bg-amber-50/30">
+                            {day === 'Monday' && (
+                              <div className="h-full flex items-center justify-center">
+                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-600/50 transform -rotate-0">R E C E S S</span>
+                              </div>
+                            )}
+                          </td>
+                        );
+                      }
+
+                      return (
+                        <td 
+                          key={day} 
+                          className="border-b border-r p-1 hover:bg-accent/5 transition-colors cursor-pointer group relative h-20"
+                          onClick={() => !slot.isBreak && setEditingEntry({ day, slotId: slot.id })}
+                        >
+                          {entry ? (
+                            <div className="h-full w-full p-2 flex flex-col justify-center items-center text-center space-y-1">
+                              <p className="text-[11px] font-bold text-foreground leading-tight">{entry.subject}</p>
+                              <p className="text-[9px] text-muted-foreground font-medium truncate w-full">{teacher?.name || 'Unknown'}</p>
+                              <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity no-print">
+                                <Edit size={10} className="text-primary" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity no-print">
+                              <Plus size={14} className="text-muted-foreground/30" />
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Entry Assignment Dialog */}
+      <Dialog open={!!editingEntry} onOpenChange={(open) => !open && setEditingEntry(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Class Period</DialogTitle>
+            <DialogDescription>
+              Assigning {editingEntry?.day} Period {slots.find(s => s.id === editingEntry?.slotId)?.label} for {selectedClass}
+            </DialogDescription>
+          </DialogHeader>
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              handleAssign(formData.get('subject') as string, formData.get('teacherId') as string);
+            }} 
+            className="space-y-4 pt-4"
+          >
+            <div className="space-y-2">
+              <Label className="text-xs">Subject Name</Label>
+              <Input 
+                name="subject" 
+                placeholder="e.g. Mathematics" 
+                defaultValue={currentEntry(editingEntry?.day || '', editingEntry?.slotId || '')?.subject || ''}
+                required 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Select Teacher</Label>
+              <Select name="teacherId" defaultValue={currentEntry(editingEntry?.day || '', editingEntry?.slotId || '')?.teacherId || ''} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chose Staff Member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teachers.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.name} ({t.subject || t.designation})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setEditingEntry(null)}>Cancel</Button>
+              <Button type="submit" className="bg-primary text-white">Save Assignment</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Configuration Dialog */}
+      <Dialog open={showConfig} onOpenChange={setShowConfig}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Timetable Configuration</DialogTitle>
+            <DialogDescription>Define your school's daily period structure.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-6 py-4">
+            <div className="space-y-2">
+              <Label className="text-xs">School Start Time</Label>
+              <Input 
+                type="time" 
+                value={configForm.startTime} 
+                onChange={e => setConfigForm({...configForm, startTime: e.target.value})} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Period Duration (mins)</Label>
+              <Input 
+                type="number" 
+                value={configForm.duration} 
+                onChange={e => setConfigForm({...configForm, duration: Number(e.target.value)})} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Number of Periods</Label>
+              <Input 
+                type="number" 
+                value={configForm.periods} 
+                onChange={e => setConfigForm({...configForm, periods: Number(e.target.value)})} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Break After Period #</Label>
+              <Input 
+                type="number" 
+                value={configForm.breakAfter} 
+                onChange={e => setConfigForm({...configForm, breakAfter: Number(e.target.value)})} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Break Duration (mins)</Label>
+              <Input 
+                type="number" 
+                value={configForm.breakDuration} 
+                onChange={e => setConfigForm({...configForm, breakDuration: Number(e.target.value)})} 
+              />
+            </div>
+          </div>
+          <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg">
+             <p className="text-[10px] text-amber-800 font-bold leading-relaxed">
+               <span className="block mb-1 font-black">WARNING:</span>
+               Regenerating slots will update the structure for ALL classes. Existing assignments will persist if slot IDs match, but new slots may appear differently.
+             </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfig(false)}>Cancel</Button>
+            <Button onClick={generateSlots} className="bg-primary text-white font-black">Generate Grid</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function ExamsView({ students }: { students: Student[] }) {
   return (
     <Card className="border border-border shadow-none rounded-xl overflow-hidden">
@@ -2757,6 +3269,68 @@ function FinanceView({
   );
 }
 
+// Reusable SearchableSelect for Inventory Items - Now allows manual "Free Select"
+const SearchableSelect = ({ items, value, onSelect, placeholder, isManual = false }: { items: {id: string, name: string}[], value: string, onSelect: (id: string, name: string) => void, placeholder: string, isManual?: boolean }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const filtered = items.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));
+  
+  // Check if ID matches or Name matches
+  const selected = items.find(i => i.id === value || i.name === value);
+  
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger render={(props) => (
+        <Button {...props} variant="outline" className="w-full h-8 text-[10px] justify-between px-2 font-normal bg-white">
+          <span className="truncate">{selected ? selected.name : (value || placeholder)}</span>
+          <Search size={12} className="opacity-50 shrink-0" />
+        </Button>
+      )} />
+      <PopoverContent className="p-0 w-64" align="start">
+        <div className="p-2 border-b bg-background sticky top-0 flex gap-2">
+          <Input 
+            placeholder="Search or Type..." 
+            value={search} 
+            onChange={e => setSearch(e.target.value)} 
+            className="h-8 text-[10px] focus-visible:ring-0 flex-1"
+            autoFocus
+          />
+          {isManual && search && !filtered.some(i => i.name.toLowerCase() === search.toLowerCase()) && (
+            <Button 
+              size="sm" 
+              variant="secondary"
+              className="h-8 text-[9px] font-bold px-2 shrink-0"
+              onClick={() => {
+                onSelect(search, search);
+                setIsOpen(false);
+                setSearch('');
+              }}
+            >
+              Use "{search}"
+            </Button>
+          )}
+        </div>
+        <div className="max-h-60 overflow-y-auto p-1 custom-scrollbar">
+          {filtered.length === 0 && !search && <div className="p-2 text-[10px] text-center italic text-muted-foreground">Select...</div>}
+          {filtered.map(item => (
+            <div 
+              key={item.id} 
+              className={`p-2 text-[10px] cursor-pointer rounded-md hover:bg-accent transition-colors ${value === item.id ? 'bg-accent font-bold' : ''}`}
+              onClick={() => {
+                onSelect(item.id, item.name);
+                setIsOpen(false);
+                setSearch('');
+              }}
+            >
+              {item.name}
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 function InventoryView({ 
   students, 
   inventory, 
@@ -2795,68 +3369,6 @@ function InventoryView({
     date: new Date().toISOString().split('T')[0],
     description: ''
   });
-
-  // Reusable SearchableSelect for Inventory Items - Now allows manual "Free Select"
-  const SearchableSelect = ({ items, value, onSelect, placeholder, isManual = false }: { items: {id: string, name: string}[], value: string, onSelect: (id: string, name: string) => void, placeholder: string, isManual?: boolean }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [search, setSearch] = useState('');
-    const filtered = items.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));
-    
-    // Check if ID matches or Name matches
-    const selected = items.find(i => i.id === value || i.name === value);
-    
-    return (
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild>
-          <Button variant="outline" className="w-full h-8 text-[10px] justify-between px-2 font-normal bg-white">
-            <span className="truncate">{selected ? selected.name : (value || placeholder)}</span>
-            <Search size={12} className="opacity-50 shrink-0" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="p-0 w-64" align="start">
-          <div className="p-2 border-b bg-background sticky top-0 flex gap-2">
-            <Input 
-              placeholder="Search or Type..." 
-              value={search} 
-              onChange={e => setSearch(e.target.value)} 
-              className="h-8 text-[10px] focus-visible:ring-0 flex-1"
-              autoFocus
-            />
-            {isManual && search && !filtered.some(i => i.name.toLowerCase() === search.toLowerCase()) && (
-              <Button 
-                size="sm" 
-                variant="secondary"
-                className="h-8 text-[9px] font-bold px-2 shrink-0"
-                onClick={() => {
-                  onSelect(search, search);
-                  setIsOpen(false);
-                  setSearch('');
-                }}
-              >
-                Use "{search}"
-              </Button>
-            )}
-          </div>
-          <div className="max-h-60 overflow-y-auto p-1 custom-scrollbar">
-            {filtered.length === 0 && !search && <div className="p-2 text-[10px] text-center italic text-muted-foreground">Select...</div>}
-            {filtered.map(item => (
-              <div 
-                key={item.id} 
-                className={`p-2 text-[10px] cursor-pointer rounded-md hover:bg-accent transition-colors ${value === item.id ? 'bg-accent font-bold' : ''}`}
-                onClick={() => {
-                  onSelect(item.id, item.name);
-                  setIsOpen(false);
-                  setSearch('');
-                }}
-              >
-                {item.name}
-              </div>
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
-    );
-  };
 
   const [invoiceForm, setInvoiceForm] = useState<{
     type: 'purchase' | 'sale';
@@ -3416,9 +3928,9 @@ function InventoryView({
                       </Select>
                    </div>
                    <Dialog open={showAddVendor} onOpenChange={setShowAddVendor}>
-                      <DialogTrigger render={
-                         <Button variant="outline" className="border-primary text-primary hover:bg-primary/5 h-9 text-xs px-4">Add Vendor</Button>
-                      } />
+                      <DialogTrigger render={(props) => (
+                         <Button {...props} variant="outline" className="border-primary text-primary hover:bg-primary/5 h-9 text-xs px-4">Add Vendor</Button>
+                      )} />
                       <DialogContent>
                          <DialogHeader><DialogTitle>Register New Vendor</DialogTitle></DialogHeader>
                          <form onSubmit={handleAddVendor} className="space-y-4 pt-4">
@@ -3447,9 +3959,9 @@ function InventoryView({
                       </DialogContent>
                    </Dialog>
                    <Dialog open={showAddPayment} onOpenChange={setShowAddPayment}>
-                      <DialogTrigger render={
-                         <Button disabled={!selectedVendor} className="bg-primary hover:bg-primary/90 text-white h-9 text-xs px-4">Record Payment</Button>
-                      } />
+                      <DialogTrigger render={(props) => (
+                         <Button {...props} disabled={!selectedVendor} className="bg-primary hover:bg-primary/90 text-white h-9 text-xs px-4">Record Payment</Button>
+                      )} />
                       <DialogContent>
                          <DialogHeader><DialogTitle>New Vendor Payment</DialogTitle></DialogHeader>
                          <form onSubmit={handleAddPayment} className="space-y-4 pt-4">
@@ -3715,5 +4227,154 @@ function AnnouncementsView() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function LoginView({ onLogin }: { onLogin: (user: UserProfile) => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const user = authService.login(email, password);
+    if (user) {
+      onLogin(user);
+    } else {
+      setError('Invalid email or password');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center">
+          <div className="flex justify-center mb-6">
+            <div className="w-20 h-20 bg-accent rounded-2xl flex items-center justify-center shadow-xl shadow-accent/20 rotate-3">
+              <GraduationCap size={40} className="text-white -rotate-3" />
+            </div>
+          </div>
+          <h2 className="text-3xl font-black text-white tracking-tight italic uppercase">Al-Naseeha School</h2>
+          <p className="mt-2 text-sm text-slate-400 font-medium tracking-wide">Enter your credentials to manage the portal</p>
+        </div>
+
+        <Card className="border border-slate-800 bg-slate-900 shadow-2xl rounded-3xl overflow-hidden p-8">
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-300 uppercase tracking-widest pl-1">Email Address</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                <Input 
+                  type="email" 
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="name@smart.edu" 
+                  className="pl-10 h-12 bg-slate-950 border-slate-800 text-white focus:ring-accent"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-300 uppercase tracking-widest pl-1">Secret Password</Label>
+              <Input 
+                type="password" 
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••" 
+                className="h-12 bg-slate-950 border-slate-800 text-white focus:ring-accent"
+              />
+            </div>
+
+            {error && <p className="text-xs font-bold text-red-400 bg-red-400/10 p-3 rounded-lg border border-red-400/20">{error}</p>}
+
+            <Button type="submit" className="w-full h-12 bg-accent hover:bg-accent/90 text-white font-black uppercase tracking-widest rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]">
+              Login Securely
+            </Button>
+          </form>
+          
+          <div className="mt-8 pt-6 border-t border-slate-800 text-center">
+            <p className="text-[10px] uppercase font-black tracking-widest text-slate-500 mb-4">Demo Accounts (Pass: 123)</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => {setEmail('principal@smart.edu'); setPassword('123');}} className="text-[9px] font-bold text-slate-400 hover:text-accent border border-slate-800 p-2 rounded-lg transition-colors">Principal</button>
+              <button onClick={() => {setEmail('accountant@smart.edu'); setPassword('123');}} className="text-[9px] font-bold text-slate-400 hover:text-accent border border-slate-800 p-2 rounded-lg transition-colors">Accountant</button>
+              <button onClick={() => {setEmail('jameel@smart.edu'); setPassword('123');}} className="text-[9px] font-bold text-slate-400 hover:text-accent border border-slate-800 p-2 rounded-lg transition-colors">Teacher</button>
+              <button onClick={() => {setEmail('ali@smart.edu'); setPassword('123');}} className="text-[9px] font-bold text-slate-400 hover:text-accent border border-slate-800 p-2 rounded-lg transition-colors">Student</button>
+            </div>
+          </div>
+        </Card>
+        
+        <p className="text-center text-[10px] text-slate-600 font-bold uppercase tracking-widest">Powered by Smart School OS &copy; 2026</p>
+      </div>
+    </div>
+  );
+}
+
+function StudentDashboardView({ student }: { student: Student }) {
+  return (
+    <div className="space-y-8">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-black text-primary tracking-tight">Welcome, {student.name}!</h2>
+          <p className="text-muted-foreground font-medium italic">Student ID: {student.rollNumber} | Class: {student.grade}-{student.section}</p>
+        </div>
+        <div className="flex items-center gap-3 bg-white p-3 rounded-2xl shadow-sm border border-border">
+          <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center"><TrendingUp size={20} /></div>
+          <div>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase">Current Attendance</p>
+            <p className="text-lg font-black text-primary">94.2%</p>
+          </div>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="border border-border shadow-none rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-accent/5 transition-all group">
+          <CardContent className="p-6">
+            <div className="w-12 h-12 bg-accent/10 text-accent rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"><CreditCard size={24} /></div>
+            <h3 className="text-lg font-black text-primary mb-1">Fee Status</h3>
+            <p className="text-xs text-muted-foreground font-medium mb-4">No pending dues for current month</p>
+            <Button className="w-full bg-primary text-white text-xs h-9 uppercase font-bold tracking-widest">Download Slip</Button>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-border shadow-none rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-accent/5 transition-all group">
+          <CardContent className="p-6">
+            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"><GraduationCap size={24} /></div>
+            <h3 className="text-lg font-black text-primary mb-1">Reports & Grades</h3>
+            <p className="text-xs text-muted-foreground font-medium mb-4">First term result is now available</p>
+            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-9 uppercase font-bold tracking-widest">View Result</Button>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-border shadow-none rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-accent/5 transition-all group">
+          <CardContent className="p-6">
+            <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"><BookOpen size={24} /></div>
+            <h3 className="text-lg font-black text-primary mb-1">Time Table</h3>
+            <p className="text-xs text-muted-foreground font-medium mb-4">Check your daily period schedule</p>
+            <Button variant="outline" className="w-full border-amber-200 text-amber-600 hover:bg-amber-50 text-xs h-9 uppercase font-bold tracking-widest">Open Schedule</Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="border border-border shadow-none rounded-3xl overflow-hidden">
+        <CardHeader className="bg-muted/30 border-b p-6">
+          <CardTitle className="text-base font-black uppercase tracking-widest flex items-center gap-2 text-primary">
+            <Bell size={18} className="text-accent" /> Recent Announcements
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="divide-y divide-border">
+            {mockAnnouncements.map(ann => (
+              <div key={ann.id} className="p-6 hover:bg-accent/5 transition-colors group">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-bold text-foreground group-hover:text-accent transition-colors">{ann.title}</h4>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">{ann.date}</span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{ann.content}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
