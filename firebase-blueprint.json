@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "student": {
+      "title": "Student",
+      "description": "Student record with academic and personal details.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "rollNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "contact": { "type": "string" },
+        "grade": { "type": "string" },
+        "section": { "type": "string" },
+        "monthlyFee": { "type": "number" },
+        "address": { "type": "string" },
+        "admissionDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["active", "inactive"] }
+      },
+      "required": ["id", "rollNumber", "name", "email", "grade"]
+    },
+    "teacher": {
+      "title": "Teacher",
+      "description": "Staff and faculty records.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "contact": { "type": "string" },
+        "designation": { "type": "string" },
+        "qualification": { "type": "string" },
+        "salary": { "type": "number" },
+        "joiningDate": { "type": "string", "format": "date" },
+        "subjects": { "type": "array" }
+      },
+      "required": ["id", "name", "email", "salary"]
+    },
+    "feeRecord": {
+      "title": "Fee Record",
+      "description": "Record of fee payments made by students.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "amount": { "type": "number" },
+        "month": { "type": "string" },
+        "year": { "type": "number" },
+        "date": { "type": "string", "format": "date" },
+        "paymentMethod": { "type": "string" },
+        "challanNumber": { "type": "string" }
+      },
+      "required": ["id", "studentId", "amount", "month"]
+    },
+    "transaction": {
+      "title": "Finance Transaction",
+      "description": "Individual income or expense entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date" },
+        "description": { "type": "string" },
+        "month": { "type": "string" },
+        "year": { "type": "number" }
+      },
+      "required": ["id", "type", "amount", "date"]
+    }
+  },
+  "firestore": {
+    "students": {
+      "schema": "student",
+      "description": "Permanent collection of all students."
+    },
+    "teachers": {
+      "schema": "teacher",
+      "description": "Staff management collection."
+    },
+    "fees": {
+      "schema": "feeRecord",
+      "description": "Student fee transaction history."
+    },
+    "transactions": {
+      "schema": "transaction",
+      "description": "General ledger for income and expenses."
+    }
+  }
+}

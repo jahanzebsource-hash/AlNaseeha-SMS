@@ -43,7 +43,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +55,7 @@ import {
 } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 import { 
   Select,
   SelectContent,
@@ -84,6 +85,8 @@ import {
   UserRole
 } from './types';
 import { authService, MOCK_USERS } from './services/authService';
+import { smartDB } from './services/smartDB';
+import { isCloudEnabled } from './services/firebase';
 import { 
   mockStudents, 
   mockTeachers, 
@@ -121,6 +124,28 @@ export default function App() {
   const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>(mockVendorPayments);
   const [timetableSlots, setTimetableSlots] = useState<TimetableSlot[]>([]);
   const [timetableEntries, setTimetableEntries] = useState<TimetableEntry[]>([]);
+
+  // Smart Sync Initialization
+  useEffect(() => {
+    const loadInitialData = async () => {
+      const storedStudents = await smartDB.getAllRecords('students');
+      if (storedStudents.length > 0) setStudents(storedStudents);
+      
+      const storedTeachers = await smartDB.getAllRecords('teachers');
+      if (storedTeachers.length > 0) setTeachers(storedTeachers);
+      
+      const storedTransactions = await smartDB.getAllRecords('transactions');
+      if (storedTransactions.length > 0) setTransactions(storedTransactions);
+    };
+    loadInitialData();
+  }, []);
+
+  // Auto-sync effect (Simplified example for students)
+  useEffect(() => {
+    if (students !== mockStudents) {
+      students.forEach(s => smartDB.saveRecord('students', s.id, s));
+    }
+  }, [students]);
 
   const totalMonthlyFee = useMemo(() => {
     return students.reduce((sum, student) => sum + student.monthlyFee, 0);
@@ -396,11 +421,15 @@ export default function App() {
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 border-r border-border pr-4 no-print">
+               <div className="flex flex-col items-end mr-2">
+                 <Badge variant="outline" className={`text-[8px] uppercase px-1 h-4 flex items-center gap-1 ${isCloudEnabled ? 'border-emerald-500 text-emerald-600 bg-emerald-50' : 'border-amber-500 text-amber-600 bg-amber-50'}`}>
+                   <div className={`w-1 h-1 rounded-full ${isCloudEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                   {isCloudEnabled ? 'Cloud Sync active' : 'Smart-Local mode'}
+                 </Badge>
+               </div>
                <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-[10px] font-bold text-accent uppercase tracking-widest gap-2">
-                    <UserSquare2 size={14} /> Switch Role
-                  </Button>
+                <PopoverTrigger className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), "text-[10px] font-bold text-accent uppercase tracking-widest gap-2")}>
+                  <UserSquare2 size={14} /> Switch Role
                 </PopoverTrigger>
                 <PopoverContent className="w-56 p-2 bg-white border-border shadow-2xl rounded-xl">
                   <div className="space-y-1">
@@ -430,9 +459,9 @@ export default function App() {
             </div>
             
             <Popover>
-              <PopoverTrigger asChild>
-                <Avatar className="h-8 w-8 bg-accent text-white font-bold text-xs cursor-pointer hover:opacity-80 transition-opacity">
-                  <AvatarFallback className="bg-accent text-white">
+              <PopoverTrigger className="h-8 w-8 bg-accent text-white font-bold text-xs cursor-pointer hover:opacity-80 transition-opacity rounded-full border-none p-0 overflow-hidden">
+                <Avatar className="h-full w-full">
+                  <AvatarFallback className="bg-accent text-white border-none">
                     {user?.name.split(' ').map(n => n[0]).join('')}
                   </AvatarFallback>
                 </Avatar>
@@ -443,6 +472,16 @@ export default function App() {
                     <p className="text-xs font-black text-foreground truncate">{user?.name}</p>
                     <p className="text-[10px] text-muted-foreground truncate">{user?.email}</p>
                   </div>
+                  
+                  {user?.role === 'principal' && (
+                    <button
+                      onClick={() => smartDB.exportFullBackup()}
+                      className="w-full text-left px-3 py-2 text-xs font-bold text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <Archive size={14} /> Backup Database (JSON)
+                    </button>
+                  )}
+
                   <button
                     onClick={handleLogout}
                     className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2"
