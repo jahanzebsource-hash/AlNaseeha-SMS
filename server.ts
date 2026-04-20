@@ -286,6 +286,39 @@ async function startServer() {
     }
   });
 
+  // Settings
+  app.get("/api/settings", async (req, res) => {
+    const db = getPool();
+    if (!db) return res.status(503).json({ error: "Database not configured" });
+    try {
+      const result = await db.query("SELECT * FROM school_settings");
+      const settingsMap: any = {};
+      result.rows.forEach(row => {
+        settingsMap[row.key] = row.value;
+      });
+      res.json(settingsMap);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/settings", async (req, res) => {
+    const db = getPool();
+    if (!db) return res.status(503).json({ error: "Database not configured" });
+    const { key, value } = req.body;
+    try {
+      await db.query(
+        "INSERT INTO school_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=CURRENT_TIMESTAMP",
+        [key, JSON.stringify(value)]
+      );
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+
   // Catch-all for undefined API routes to prevent HTML response
   app.all("/api/*", (req, res) => {
     res.status(404).json({ error: `API route ${req.url} not found` });

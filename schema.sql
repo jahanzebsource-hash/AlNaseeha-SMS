@@ -91,6 +91,13 @@ CREATE TABLE inventory (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 8. School Settings Table
+CREATE TABLE school_settings (
+    key TEXT PRIMARY KEY,
+    value JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Index for performance
 CREATE INDEX idx_students_roll ON students(roll_number);
 CREATE INDEX idx_fees_student ON fee_records(student_id);

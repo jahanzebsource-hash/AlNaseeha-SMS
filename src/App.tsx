@@ -39,7 +39,12 @@ import {
   Package,
   History,
   Archive,
-  Calculator
+  Calculator,
+  RefreshCw,
+  BarChart3,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  Wallet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -99,11 +104,27 @@ import {
   mockVendorPayments
 } from './lib/mockData';
 
-type View = 'dashboard' | 'students' | 'teachers' | 'attendance' | 'fees' | 'exams' | 'announcements' | 'finance' | 'cashbook' | 'inventory' | 'timetable';
+type View = 'dashboard' | 'students' | 'teachers' | 'attendance' | 'fees' | 'exams' | 'announcements' | 'finance' | 'cashbook' | 'inventory' | 'timetable' | 'session' | 'balancesheet';
 
 const SCHOOL_CLASSES = [
   'Play Group', 'Nursery', 'KG', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'
 ];
+
+const SESSION_SEQUENCE: Record<string, string> = {
+  'Play Group': 'Nursery',
+  'Nursery': 'KG',
+  'KG': '1st',
+  '1st': '2nd',
+  '2nd': '3rd',
+  '3rd': '4th',
+  '4th': '5th',
+  '5th': '6th',
+  '6th': '7th',
+  '7th': '8th',
+  '8th': '9th',
+  '9th': '10th',
+  '10th': 'Alumnus'
+};
 
 const SCHOOL_LOGO = "https://i.postimg.cc/hJNQDRvB/alnaseeha-logo.png"; // User provided link
 const SCHOOL_NAME = "Al-Naseeha High School";
@@ -125,6 +146,35 @@ export default function App() {
   const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>(mockVendorPayments);
   const [timetableSlots, setTimetableSlots] = useState<TimetableSlot[]>([]);
   const [timetableEntries, setTimetableEntries] = useState<TimetableEntry[]>([]);
+  const [openingBalance, setOpeningBalance] = useState<number>(0);
+  const [currentSession, setCurrentSession] = useState<string>('2023-24');
+
+  // Load Settings from DB
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch('/api/settings');
+        const data = await response.json();
+        if (data.openingBalance) setOpeningBalance(Number(data.openingBalance));
+        if (data.currentSession) setCurrentSession(data.currentSession);
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const saveSetting = async (key: string, value: any) => {
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value })
+      });
+    } catch (err) {
+      console.error("Failed to save setting:", err);
+    }
+  };
 
   // Smart Sync Initialization
   useEffect(() => {
@@ -162,6 +212,8 @@ export default function App() {
     { id: 'cashbook', label: 'Daily Cashbook', icon: Calculator, roles: ['admin', 'principal', 'accountant'] },
     { id: 'inventory', label: 'Inventory & Sale', icon: Package, roles: ['admin', 'principal', 'accountant'] },
     { id: 'timetable', label: 'Time Table', icon: BookOpen, roles: ['admin', 'principal', 'teacher', 'student'] },
+    { id: 'session', label: 'Session & Promo', icon: RefreshCw, roles: ['admin', 'principal'] },
+    { id: 'balancesheet', label: 'Balance Sheet', icon: BarChart3, roles: ['admin', 'principal', 'accountant'] },
     { id: 'exams', label: 'Examinations', icon: GraduationCap, roles: ['admin', 'principal', 'teacher', 'accountant'] },
     { id: 'announcements', label: 'Announcements', icon: Bell, roles: ['all'] },
   ];
@@ -326,6 +378,33 @@ export default function App() {
         );
       case 'exams':
         return <ExamsView students={displayStudents} />;
+      case 'session':
+        return (
+          <SessionManagementView 
+            students={students} 
+            session={currentSession}
+            onPromote={(promoted) => {
+              setStudents(promoted);
+              // Save to smartDB
+              promoted.forEach(s => smartDB.saveRecord('students', s));
+            }}
+            onUpdateSession={(s) => {
+              setCurrentSession(s);
+              saveSetting('currentSession', s);
+            }}
+          />
+        );
+      case 'balancesheet':
+        return (
+          <BalanceSheetView 
+            transactions={transactions} 
+            openingBalance={openingBalance}
+            onUpdateOpeningBalance={(bal) => {
+              setOpeningBalance(bal);
+              saveSetting('openingBalance', bal);
+            }}
+          />
+        );
       case 'announcements':
         return <AnnouncementsView />;
       default:
@@ -4263,6 +4342,224 @@ function InventoryView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function SessionManagementView({ 
+  students, 
+  session,
+  onPromote,
+  onUpdateSession
+}: { 
+  students: Student[], 
+  session: string,
+  onPromote: (s: Student[]) => void,
+  onUpdateSession: (s: string) => void
+}) {
+  const [newSession, setNewSession] = useState(session);
+  const [isPromoting, setIsPromoting] = useState(false);
+
+  const handlePromote = () => {
+    if (!window.confirm("Are you sure? This will promote all students to the next class based on the sequence. This action is irreversible.")) return;
+    
+    setIsPromoting(true);
+    setTimeout(() => {
+      const promotedStudents = students.map(s => ({
+        ...s,
+        grade: SESSION_SEQUENCE[s.grade] || s.grade
+      }));
+      onPromote(promotedStudents);
+      setIsPromoting(false);
+      alert("Promotion successful! Students have been moved to their next classes.");
+    }, 1500);
+  };
+
+  return (
+    <div className="space-y-6">
+       <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-black tracking-tight">Session Management</h2>
+        <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 px-3 py-1 text-xs">
+          Current: {session}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="border border-border shadow-none rounded-xl">
+          <CardHeader>
+            <CardTitle className="text-base font-bold">Update Current Session</CardTitle>
+            <CardDescription className="text-xs">Set the active academic session name (e.g., 2024-25).</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Academic Session Name</Label>
+              <Input 
+                value={newSession} 
+                onChange={(e) => setNewSession(e.target.value)}
+                placeholder="e.g. 2024-25"
+                className="h-10 text-sm"
+              />
+            </div>
+            <Button 
+              onClick={() => onUpdateSession(newSession)}
+              className="w-full bg-primary h-10 text-xs font-bold"
+            >Update Session Info</Button>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-border shadow-none rounded-xl bg-amber-50/30 border-amber-100">
+          <CardHeader>
+            <CardTitle className="text-base font-bold text-amber-800">Mass Student Promotion</CardTitle>
+            <CardDescription className="text-xs text-amber-600/80">Promote all students to their next level (e.g. 9th to 10th). Graduation class will be marked Alumnus.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-3 bg-white border border-amber-200 rounded-lg space-y-2 text-[11px] text-amber-800">
+              <p><strong>Note:</strong> Ensure all final exams are marked before clicking.</p>
+              <p><strong>Sequence:</strong> PG → Nursery → KG → 1st ... → 10th → Alumnus</p>
+            </div>
+            <Button 
+              onClick={handlePromote}
+              disabled={isPromoting}
+              className="w-full bg-amber-600 hover:bg-amber-700 h-10 text-xs font-bold flex items-center gap-2"
+            >
+              {isPromoting ? 'Promoting Students...' : <><RefreshCw size={14} /> Run Promotion Logic</>}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function BalanceSheetView({ 
+  transactions, 
+  openingBalance,
+  onUpdateOpeningBalance
+}: { 
+  transactions: FinanceTransaction[], 
+  openingBalance: number,
+  onUpdateOpeningBalance: (val: number) => void
+}) {
+  const [editOpening, setEditOpening] = useState(false);
+  const [openingVal, setOpeningVal] = useState(openingBalance.toString());
+
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+  const netProfit = totalIncome - totalExpense;
+  const cashInHand = netProfit + openingBalance;
+
+  return (
+    <div className="space-y-8 no-print">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-black tracking-tight">Financial Balance Sheet</h2>
+          <p className="text-xs text-muted-foreground capitalize">Overall financial health and cash-in-hand summary</p>
+        </div>
+        <div className="flex gap-2">
+           <Button variant="outline" size="sm" onClick={() => window.print()} className="h-9 text-xs border-border">
+            <Printer size={14} className="mr-2" /> Print Summary
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+         <Card className="border-none shadow-sm bg-blue-600 text-white rounded-2xl p-6">
+           <div className="flex justify-between items-start mb-4">
+             <div className="p-2 bg-white/10 rounded-lg"><Calculator size={18} /></div>
+             <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setEditOpening(!editOpening)}
+              className="text-[10px] h-6 px-2 bg-white/10 hover:bg-white/20 text-white border-none uppercase font-bold"
+             >Set Opening</Button>
+           </div>
+           <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">Opening Balance</p>
+           <h3 className="text-2xl font-black">Rs.{openingBalance.toLocaleString()}</h3>
+           {editOpening && (
+             <div className="mt-3 flex gap-2">
+               <Input 
+                value={openingVal} 
+                onChange={(e) => setOpeningVal(e.target.value)}
+                className="h-8 text-xs bg-white text-black border-none"
+                placeholder="0"
+               />
+               <Button 
+                onClick={() => {
+                  onUpdateOpeningBalance(Number(openingVal));
+                  setEditOpening(false);
+                }}
+                className="h-8 text-[10px] bg-emerald-500 hover:bg-emerald-600 border-none px-2 font-bold"
+               >Save</Button>
+             </div>
+           )}
+         </Card>
+
+         <Card className="border border-border shadow-none rounded-2xl p-6">
+           <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg w-fit mb-4"><ArrowUpCircle size={18} /></div>
+           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Income</p>
+           <h3 className="text-2xl font-black text-foreground">Rs.{totalIncome.toLocaleString()}</h3>
+         </Card>
+
+         <Card className="border border-border shadow-none rounded-2xl p-6">
+           <div className="p-2 bg-red-100 text-red-600 rounded-lg w-fit mb-4"><ArrowDownCircle size={18} /></div>
+           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Expense</p>
+           <h3 className="text-2xl font-black text-foreground">Rs.{totalExpense.toLocaleString()}</h3>
+         </Card>
+
+         <Card className="border-none shadow-sm bg-accent text-white rounded-2xl p-6">
+           <div className="p-2 bg-white/10 rounded-lg w-fit mb-4"><Wallet size={18} /></div>
+           <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">Cash in Hand (Net)</p>
+           <h3 className="text-2xl font-black">Rs.{cashInHand.toLocaleString()}</h3>
+         </Card>
+      </div>
+
+      <Card className="border border-border shadow-none rounded-2xl overflow-hidden">
+        <CardHeader className="bg-muted/30 border-b">
+           <CardTitle className="text-sm font-bold flex items-center justify-between">
+            Financial Ledger Breakdown
+            <Badge variant="outline" className={cashInHand > 0 ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}>
+              {cashInHand > 0 ? 'Surplus' : 'Deficit'}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-background border-b text-[11px] font-bold uppercase text-muted-foreground">
+              <tr>
+                <th className="px-6 py-4">Item Description</th>
+                <th className="px-6 py-4 text-emerald-600">Credit (In)</th>
+                <th className="px-6 py-4 text-red-600">Debit (Out)</th>
+                <th className="px-6 py-4 text-right">Running Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b bg-muted/10 font-medium">
+                <td className="px-6 py-4">Session Opening Balance (Previous Cash)</td>
+                <td className="px-6 py-4 text-emerald-600">Rs.{openingBalance.toLocaleString()}</td>
+                <td className="px-6 py-4">-</td>
+                <td className="px-6 py-4 text-right font-bold">Rs.{openingBalance.toLocaleString()}</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-6 py-4">Current Session Income (Fees, Sales, etc.)</td>
+                <td className="px-6 py-4 text-emerald-600">Rs.{totalIncome.toLocaleString()}</td>
+                <td className="px-6 py-4">-</td>
+                <td className="px-6 py-4 text-right">Rs.{(openingBalance + totalIncome).toLocaleString()}</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-6 py-4">Current Session Expenses (Salaries, Utils, etc.)</td>
+                <td className="px-6 py-4">-</td>
+                <td className="px-6 py-4 text-red-600">Rs.{totalExpense.toLocaleString()}</td>
+                <td className="px-6 py-4 text-right">Rs.{cashInHand.toLocaleString()}</td>
+              </tr>
+              <tr className="bg-accent text-white font-black text-base">
+                <td className="px-6 py-5">CURRENT CASH STATUS (IN-HAND)</td>
+                <td colSpan={2}></td>
+                <td className="px-6 py-5 text-right">Rs.{cashInHand.toLocaleString()}</td>
+              </tr>
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
