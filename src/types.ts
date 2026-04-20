@@ -7,6 +7,8 @@ export interface UserProfile {
   role: UserRole;
   avatarUrl?: string;
   assignedClass?: string; // For teachers to see only their class
+  loginId?: string;
+  isTeaching?: boolean;
   createdAt: string;
 }
 
@@ -25,13 +27,14 @@ export interface Student extends UserProfile {
 }
 
 export interface Teacher extends UserProfile {
-  role: 'teacher' | 'staff';
+  role: UserRole;
   employeeId: string;
   subject?: string;
   qualification: string;
   contactNumber: string;
   baseSalary: number;
   designation: string;
+  password?: string; // Temporary field for form submission
 }
 
 export interface PayrollRecord {

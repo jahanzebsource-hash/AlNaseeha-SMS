@@ -1,52 +1,29 @@
-import { UserProfile, UserRole } from '../types';
+import { UserProfile } from '../types';
 
 const AUTH_KEY = 'school_app_auth_user';
 
-export const MOCK_USERS: (UserProfile & { password: string })[] = [
-  {
-    id: 'u1',
-    email: 'principal@smart.edu',
-    name: 'Muhammad Jahanzeb',
-    role: 'principal',
-    password: '123',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'u2',
-    email: 'accountant@smart.edu',
-    name: 'Mr. Siddiqui',
-    role: 'accountant',
-    password: '123',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'u3',
-    email: 'jameel@smart.edu',
-    name: 'Dr. Jameel',
-    role: 'teacher',
-    assignedClass: '10', // Teacher of Grade 10
-    password: '123',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'u4',
-    email: 'ali@smart.edu',
-    name: 'Ali Khan',
-    role: 'student',
-    password: '123',
-    createdAt: new Date().toISOString()
-  }
-];
-
 export const authService = {
-  login: (email: string, password: string): UserProfile | null => {
-    const user = MOCK_USERS.find(u => u.email === email && u.password === password);
-    if (user) {
-      const { password, ...profile } = user;
+  login: async (loginId: string, password: string): Promise<UserProfile | null> => {
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ loginId, password }),
+      });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      const profile = await response.json();
       localStorage.setItem(AUTH_KEY, JSON.stringify(profile));
       return profile;
+    } catch (error) {
+      console.error('Login error:', error);
+      return null;
     }
-    return null;
   },
 
   logout: () => {

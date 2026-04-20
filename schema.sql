@@ -1,7 +1,7 @@
 -- Al Naseeha High School Database Schema (PostgreSQL)
 
 -- 1. Students Table
-CREATE TABLE students (
+CREATE TABLE IF NOT EXISTS students (
     id TEXT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255),
@@ -19,21 +19,26 @@ CREATE TABLE students (
 );
 
 -- 2. Teachers Table
-CREATE TABLE teachers (
+CREATE TABLE IF NOT EXISTS teachers (
     id TEXT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    email VARCHAR(255),
+    email VARCHAR(255) UNIQUE,
     contact_number VARCHAR(50),
     designation VARCHAR(100),
     base_salary NUMERIC(10, 2),
     subject VARCHAR(100),
     qualification TEXT,
     joining_date DATE DEFAULT CURRENT_DATE,
+    login_id VARCHAR(100) UNIQUE,
+    password_hash TEXT,
+    role VARCHAR(50) DEFAULT 'teacher',
+    assigned_class VARCHAR(50),
+    is_teaching BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 3. Fee Records Table
-CREATE TABLE fee_records (
+CREATE TABLE IF NOT EXISTS fee_records (
     id TEXT PRIMARY KEY,
     student_id TEXT REFERENCES students(id) ON DELETE CASCADE,
     amount NUMERIC(10, 2) NOT NULL,
@@ -44,7 +49,7 @@ CREATE TABLE fee_records (
 );
 
 -- 4. Transactions Table (General Ledger)
-CREATE TABLE transactions (
+CREATE TABLE IF NOT EXISTS transactions (
     id TEXT PRIMARY KEY,
     type VARCHAR(20) CHECK (type IN ('income', 'expense')),
     category VARCHAR(100),
@@ -58,7 +63,7 @@ CREATE TABLE transactions (
 );
 
 -- 5. Attendance Table
-CREATE TABLE attendance (
+CREATE TABLE IF NOT EXISTS attendance (
     entity_id TEXT NOT NULL, -- Student or Teacher ID
     entity_type VARCHAR(20) CHECK (entity_type IN ('student', 'teacher')),
     status VARCHAR(20) CHECK (status IN ('present', 'absent', 'late', 'leave')),
@@ -68,7 +73,7 @@ CREATE TABLE attendance (
 );
 
 -- 6. Payroll Table
-CREATE TABLE payroll (
+CREATE TABLE IF NOT EXISTS payroll (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES teachers(id),
     amount NUMERIC(10, 2) NOT NULL,
@@ -79,7 +84,7 @@ CREATE TABLE payroll (
 );
 
 -- 7. Inventory Table
-CREATE TABLE inventory (
+CREATE TABLE IF NOT EXISTS inventory (
     id TEXT PRIMARY KEY,
     item_name VARCHAR(255) NOT NULL,
     category VARCHAR(100),
@@ -92,7 +97,7 @@ CREATE TABLE inventory (
 );
 
 -- 8. School Settings Table
-CREATE TABLE school_settings (
+CREATE TABLE IF NOT EXISTS school_settings (
     key TEXT PRIMARY KEY,
     value JSONB NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

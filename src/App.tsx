@@ -89,7 +89,7 @@ import {
   UserProfile,
   UserRole
 } from './types';
-import { authService, MOCK_USERS } from './services/authService';
+import { authService } from './services/authService';
 import { smartDB } from './services/smartDB';
 import { isCloudEnabled } from './services/firebase';
 import { 
@@ -518,7 +518,8 @@ export default function App() {
                 <PopoverContent className="w-56 p-2 bg-white border-border shadow-2xl rounded-xl">
                   <div className="space-y-1">
                     <p className="text-[9px] font-black text-muted-foreground uppercase px-2 py-1 tracking-widest">Select Demo Account</p>
-                    {MOCK_USERS.map(u => (
+                    {/* Demo accounts removed */}
+                    {[].map(u => (
                       <button
                         key={u.id}
                         onClick={() => {
@@ -977,7 +978,11 @@ function TeachersView({
     contactNumber: '',
     baseSalary: '',
     qualification: '',
-    assignedClass: ''
+    assignedClass: '',
+    loginId: '',
+    password: '',
+    role: 'teacher' as UserRole,
+    isTeaching: true
   });
   
   const [payrollForm, setPayrollForm] = useState({
@@ -986,47 +991,86 @@ function TeachersView({
     month: 'May',
   });
 
-  const handleAddStaff = (e: React.FormEvent) => {
+  const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newStaff: Teacher = {
-      id: Math.random().toString(36).substr(2, 9),
-      email: `${staffForm.name.toLowerCase().replace(/\s/g, '')}@school.com`,
-      role: 'teacher',
+    const newStaffPayload = {
       name: staffForm.name,
       designation: staffForm.designation,
       employeeId: staffForm.employeeId,
       contactNumber: staffForm.contactNumber,
       baseSalary: Number(staffForm.baseSalary),
       qualification: staffForm.qualification,
-      assignedClass: staffForm.assignedClass,
-      createdAt: new Date().toISOString(),
+      assignedClass: staffForm.assignedClass === 'none' ? undefined : staffForm.assignedClass,
+      loginId: staffForm.loginId,
+      password: staffForm.password,
+      role: staffForm.role,
+      isTeaching: staffForm.isTeaching,
+      email: `${staffForm.name.toLowerCase().replace(/\s/g, '')}@school.com`,
     };
-    onAddTeacher(newStaff);
-    setOpenAddStaff(false);
-    setStaffForm({ name: '', designation: '', employeeId: '', contactNumber: '', baseSalary: '', qualification: '', assignedClass: '' });
+
+    try {
+      const response = await fetch('/api/teachers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newStaffPayload),
+      });
+      if (response.ok) {
+        const savedStaff = await response.json();
+        onAddTeacher(savedStaff);
+        setOpenAddStaff(false);
+        setStaffForm({ 
+          name: '', designation: '', employeeId: '', contactNumber: '', 
+          baseSalary: '', qualification: '', assignedClass: '', 
+          loginId: '', password: '', role: 'teacher', isTeaching: true 
+        });
+      } else {
+        alert("Failed to save staff. Check if Login ID is unique.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saving staff member.");
+    }
   };
 
-  const handleEditStaff = (e: React.FormEvent) => {
+  const handleEditStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStaff) return;
     
-    const updatedStaff: Teacher = {
-      ...selectedStaff,
+    const updatedStaffPayload = {
+      id: selectedStaff.id,
       name: staffForm.name,
       designation: staffForm.designation,
       employeeId: staffForm.employeeId,
       contactNumber: staffForm.contactNumber,
       baseSalary: Number(staffForm.baseSalary),
       qualification: staffForm.qualification,
-      assignedClass: staffForm.assignedClass,
+      assignedClass: staffForm.assignedClass === 'none' ? undefined : staffForm.assignedClass,
+      loginId: staffForm.loginId,
+      password: staffForm.password || undefined, // Only send if changed
+      role: staffForm.role,
+      isTeaching: staffForm.isTeaching,
+      email: selectedStaff.email
     };
     
-    // In a real app we'd call an update function. for now we just add to show it works or the user can refresh
-    // Since we don't have an onUpdateTeacher prop yet, I'll just use onAddTeacher or inform the user
-    // Fixed: I'll add onUpdateTeacher or just replace in local state if I had access, but I'll use onAddTeacher for now as a placeholder or assume it handles both
-    onAddTeacher(updatedStaff); 
-    setSelectedStaff(null);
-    setStaffForm({ name: '', designation: '', employeeId: '', contactNumber: '', baseSalary: '', qualification: '', assignedClass: '' });
+    try {
+      const response = await fetch('/api/teachers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedStaffPayload),
+      });
+      if (response.ok) {
+        const savedStaff = await response.json();
+        onAddTeacher(savedStaff); 
+        setSelectedStaff(null);
+        setStaffForm({ 
+          name: '', designation: '', employeeId: '', contactNumber: '', 
+          baseSalary: '', qualification: '', assignedClass: '', 
+          loginId: '', password: '', role: 'teacher', isTeaching: true 
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleGeneratePayroll = (e: React.FormEvent) => {
@@ -1174,6 +1218,41 @@ function TeachersView({
                     <Label htmlFor="baseSal" className="text-right text-xs">Base Salary</Label>
                     <Input id="baseSal" type="number" value={staffForm.baseSalary} onChange={(e) => setStaffForm({...staffForm, baseSalary: e.target.value})} className="col-span-3 h-8 text-xs" required />
                   </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="staffRole" className="text-right text-xs">Role</Label>
+                    <Select value={staffForm.role} onValueChange={(v: any) => setStaffForm({...staffForm, role: v})}>
+                      <SelectTrigger className="col-span-3 h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="teacher">Teacher</SelectItem>
+                        <SelectItem value="principal">Principal</SelectItem>
+                        <SelectItem value="accountant">Accountant</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="staff">Other Staff</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label className="text-right text-xs">Staff Type</Label>
+                    <Select value={staffForm.isTeaching ? 'teaching' : 'non-teaching'} onValueChange={(v) => setStaffForm({...staffForm, isTeaching: v === 'teaching'})}>
+                      <SelectTrigger className="col-span-3 h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="teaching">Teaching Staff</SelectItem>
+                        <SelectItem value="non-teaching">Non-Teaching Staff</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="loginId" className="text-right text-xs">Login ID</Label>
+                    <Input id="loginId" value={staffForm.loginId} onChange={(e) => setStaffForm({...staffForm, loginId: e.target.value})} className="col-span-3 h-8 text-xs" placeholder="e.g. jameel_123" required />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="pass" className="text-right text-xs">Password</Label>
+                    <Input id="pass" type="password" value={staffForm.password} onChange={(e) => setStaffForm({...staffForm, password: e.target.value})} className="col-span-3 h-8 text-xs" placeholder="••••••••" required />
+                  </div>
                    <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="qual" className="text-right text-xs">Qualification</Label>
                     <Input id="qual" value={staffForm.qualification} onChange={(e) => setStaffForm({...staffForm, qualification: e.target.value})} className="col-span-3 h-8 text-xs" required />
@@ -1245,7 +1324,7 @@ function TeachersView({
                   >
                     <DollarSign size={14} className="mr-1" /> Payroll
                   </Button>
-                  <Button 
+                    <Button 
                     variant="outline" 
                     size="sm" 
                     className="flex-1 text-[11px] h-8 border-border hover:bg-accent hover:text-white"
@@ -1257,7 +1336,11 @@ function TeachersView({
                         contactNumber: teacher.contactNumber,
                         baseSalary: teacher.baseSalary?.toString() || '',
                         qualification: teacher.qualification,
-                        assignedClass: teacher.assignedClass || ''
+                        assignedClass: teacher.assignedClass || 'none',
+                        loginId: teacher.loginId || '',
+                        password: '', // Don't show existing password
+                        role: teacher.role,
+                        isTeaching: teacher.isTeaching ?? true
                       });
                       setSelectedStaff(teacher);
                     }}
@@ -1401,6 +1484,41 @@ function TeachersView({
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="editSalary" className="text-right text-xs">Base Salary</Label>
               <Input id="editSalary" type="number" value={staffForm.baseSalary} onChange={(e) => setStaffForm({...staffForm, baseSalary: e.target.value})} className="col-span-3 h-8 text-xs" required />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="editRole" className="text-right text-xs">Role</Label>
+              <Select value={staffForm.role} onValueChange={(v: any) => setStaffForm({...staffForm, role: v})}>
+                <SelectTrigger className="col-span-3 h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="teacher">Teacher</SelectItem>
+                  <SelectItem value="principal">Principal</SelectItem>
+                  <SelectItem value="accountant">Accountant</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="staff">Other Staff</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right text-xs">Staff Type</Label>
+              <Select value={staffForm.isTeaching ? 'teaching' : 'non-teaching'} onValueChange={(v) => setStaffForm({...staffForm, isTeaching: v === 'teaching'})}>
+                <SelectTrigger className="col-span-3 h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="teaching">Teaching Staff</SelectItem>
+                  <SelectItem value="non-teaching">Non-Teaching Staff</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="editLoginId" className="text-right text-xs">Login ID</Label>
+              <Input id="editLoginId" value={staffForm.loginId} onChange={(e) => setStaffForm({...staffForm, loginId: e.target.value})} className="col-span-3 h-8 text-xs" required />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="editPass" className="text-right text-xs">New Password</Label>
+              <Input id="editPass" type="password" value={staffForm.password} onChange={(e) => setStaffForm({...staffForm, password: e.target.value})} className="col-span-3 h-8 text-xs" placeholder="Leave empty to keep current" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="editQual" className="text-right text-xs">Qualification</Label>
@@ -4606,17 +4724,27 @@ function AnnouncementsView() {
 }
 
 function LoginView({ onLogin }: { onLogin: (user: UserProfile) => void }) {
-  const [email, setEmail] = useState('');
+  const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = authService.login(email, password);
-    if (user) {
-      onLogin(user);
-    } else {
-      setError('Invalid email or password');
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      const user = await authService.login(loginId, password);
+      if (user) {
+        onLogin(user);
+      } else {
+        setError('Invalid login ID or password');
+      }
+    } catch (err) {
+      setError('An error occurred during login. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -4636,45 +4764,46 @@ function LoginView({ onLogin }: { onLogin: (user: UserProfile) => void }) {
         <Card className="border border-slate-800 bg-slate-900 shadow-2xl rounded-3xl overflow-hidden p-8">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-300 uppercase tracking-widest pl-1">Email Address</Label>
+              <Label className="text-xs font-bold text-slate-300 uppercase tracking-widest pl-1">Login ID</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                 <Input 
-                  type="email" 
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="name@smart.edu" 
+                  type="text" 
+                  value={loginId}
+                  onChange={e => setLoginId(e.target.value)}
+                  placeholder="e.g. principal_admin" 
                   className="pl-10 h-12 bg-slate-950 border-slate-800 text-white focus:ring-accent"
+                  required
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-300 uppercase tracking-widest pl-1">Secret Password</Label>
+              <Label className="text-xs font-bold text-slate-300 uppercase tracking-widest pl-1">Password</Label>
               <Input 
                 type="password" 
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••" 
                 className="h-12 bg-slate-950 border-slate-800 text-white focus:ring-accent"
+                required
               />
             </div>
 
             {error && <p className="text-xs font-bold text-red-400 bg-red-400/10 p-3 rounded-lg border border-red-400/20">{error}</p>}
 
-            <Button type="submit" className="w-full h-12 bg-accent hover:bg-accent/90 text-white font-black uppercase tracking-widest rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]">
-              Login Securely
+            <Button 
+              type="submit" 
+              disabled={isLoading}
+              className="w-full h-12 bg-accent hover:bg-accent/90 text-white font-black uppercase tracking-widest rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              {isLoading ? 'Logging in...' : 'Login Securely'}
             </Button>
           </form>
           
           <div className="mt-8 pt-6 border-t border-slate-800 text-center">
-            <p className="text-[10px] uppercase font-black tracking-widest text-slate-500 mb-4">Demo Accounts (Pass: 123)</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => {setEmail('principal@smart.edu'); setPassword('123');}} className="text-[9px] font-bold text-slate-400 hover:text-accent border border-slate-800 p-2 rounded-lg transition-colors">Principal</button>
-              <button onClick={() => {setEmail('accountant@smart.edu'); setPassword('123');}} className="text-[9px] font-bold text-slate-400 hover:text-accent border border-slate-800 p-2 rounded-lg transition-colors">Accountant</button>
-              <button onClick={() => {setEmail('jameel@smart.edu'); setPassword('123');}} className="text-[9px] font-bold text-slate-400 hover:text-accent border border-slate-800 p-2 rounded-lg transition-colors">Teacher</button>
-              <button onClick={() => {setEmail('ali@smart.edu'); setPassword('123');}} className="text-[9px] font-bold text-slate-400 hover:text-accent border border-slate-800 p-2 rounded-lg transition-colors">Student</button>
-            </div>
+            <p className="text-[10px] uppercase font-black tracking-widest text-slate-500 mb-4">Account Access Guide</p>
+            <p className="text-[9px] text-slate-400">Contact the administrator if you have forgotten your Login ID or Password.</p>
           </div>
         </Card>
         
