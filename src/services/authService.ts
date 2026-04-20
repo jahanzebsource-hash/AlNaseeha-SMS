@@ -6,7 +6,7 @@ export const MOCK_USERS: (UserProfile & { password: string })[] = [
   {
     id: 'u1',
     email: 'principal@smart.edu',
-    name: 'Principal Ahmed',
+    name: 'Muhammad Jahanzeb',
     role: 'principal',
     password: '123',
     createdAt: new Date().toISOString()
@@ -24,6 +24,7 @@ export const MOCK_USERS: (UserProfile & { password: string })[] = [
     email: 'jameel@smart.edu',
     name: 'Dr. Jameel',
     role: 'teacher',
+    assignedClass: '10', // Teacher of Grade 10
     password: '123',
     createdAt: new Date().toISOString()
   },

@@ -6,6 +6,7 @@ export interface UserProfile {
   name: string;
   role: UserRole;
   avatarUrl?: string;
+  assignedClass?: string; // For teachers to see only their class
   createdAt: string;
 }
 

@@ -105,7 +105,8 @@ const SCHOOL_CLASSES = [
   'Play Group', 'Nursery', 'KG', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'
 ];
 
-const SCHOOL_LOGO = "https://i.ibb.co/vzN89vG/school-logo.png"; // Placeholder - User should replace with actual uploaded logo path
+const SCHOOL_LOGO = "https://i.postimg.cc/hJNQDRvB/alnaseeha-logo.png"; // User provided link
+const SCHOOL_NAME = "Al-Naseeha High School";
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(authService.getCurrentUser());
@@ -143,7 +144,7 @@ export default function App() {
   // Auto-sync effect (Simplified example for students)
   useEffect(() => {
     if (students !== mockStudents) {
-      students.forEach(s => smartDB.saveRecord('students', s.id, s));
+      students.forEach(s => smartDB.saveRecord('students', s));
     }
   }, [students]);
 
@@ -153,15 +154,15 @@ export default function App() {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'principal', 'teacher', 'accountant'] },
-    { id: 'students', label: 'Student Management', icon: Users, roles: ['admin', 'principal'] },
-    { id: 'teachers', label: 'Staff & Teachers', icon: UserSquare2, roles: ['admin', 'principal'] },
-    { id: 'attendance', label: 'Attendance System', icon: CalendarCheck, roles: ['admin', 'principal', 'teacher'] },
+    { id: 'students', label: 'Student Management', icon: Users, roles: ['admin', 'principal', 'accountant'] },
+    { id: 'teachers', label: 'Staff & Teachers', icon: UserSquare2, roles: ['admin', 'principal', 'accountant'] },
+    { id: 'attendance', label: 'Attendance System', icon: CalendarCheck, roles: ['admin', 'principal', 'teacher', 'accountant'] },
     { id: 'fees', label: 'Fee & Financials', icon: CreditCard, roles: ['admin', 'principal', 'accountant'] },
     { id: 'finance', label: 'Income & Expense', icon: Receipt, roles: ['admin', 'principal', 'accountant'] },
     { id: 'cashbook', label: 'Daily Cashbook', icon: Calculator, roles: ['admin', 'principal', 'accountant'] },
     { id: 'inventory', label: 'Inventory & Sale', icon: Package, roles: ['admin', 'principal', 'accountant'] },
     { id: 'timetable', label: 'Time Table', icon: BookOpen, roles: ['admin', 'principal', 'teacher', 'student'] },
-    { id: 'exams', label: 'Examinations', icon: GraduationCap, roles: ['admin', 'principal', 'teacher'] },
+    { id: 'exams', label: 'Examinations', icon: GraduationCap, roles: ['admin', 'principal', 'teacher', 'accountant'] },
     { id: 'announcements', label: 'Announcements', icon: Bell, roles: ['all'] },
   ];
 
@@ -180,11 +181,15 @@ export default function App() {
       return <StudentDashboardView student={studentData} />;
     }
 
+    const displayStudents = user?.role === 'teacher' && user.assignedClass 
+      ? students.filter(s => s.grade === user.assignedClass)
+      : students;
+
     switch (activeView) {
       case 'dashboard':
-        return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} />;
+        return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} setActiveView={setActiveView} />;
       case 'students':
-        return <StudentsView students={students} onAddStudent={(s) => setStudents(prev => prev.some(item => item.id === s.id) ? prev.map(item => item.id === s.id ? s : item) : [...prev, s])} />;
+        return <StudentsView students={displayStudents} onAddStudent={(s) => setStudents(prev => prev.some(item => item.id === s.id) ? prev.map(item => item.id === s.id ? s : item) : [...prev, s])} />;
       case 'teachers':
         return (
           <TeachersView 
@@ -197,7 +202,7 @@ export default function App() {
       case 'attendance':
         return (
           <AttendanceView 
-            students={students} 
+            students={displayStudents} 
             attendance={attendance}
             onMarkAttendance={(sId, status) => {
               const today = new Date().toISOString().split('T')[0];
@@ -211,7 +216,7 @@ export default function App() {
                   studentId: sId,
                   status,
                   date: today,
-                  markedBy: 'Admin'
+                  markedBy: user?.name || 'Admin'
                 }];
               });
             }}
@@ -320,11 +325,11 @@ export default function App() {
           />
         );
       case 'exams':
-        return <ExamsView students={students} />;
+        return <ExamsView students={displayStudents} />;
       case 'announcements':
         return <AnnouncementsView />;
       default:
-        return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} />;
+        return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} setActiveView={setActiveView} />;
     }
   };
 
@@ -512,7 +517,7 @@ export default function App() {
   );
 }
 
-function DashboardView({ totalMonthlyFee, recentStudents }: { totalMonthlyFee: number, recentStudents: Student[] }) {
+function DashboardView({ totalMonthlyFee, recentStudents, setActiveView }: { totalMonthlyFee: number, recentStudents: Student[], setActiveView: (v: View) => void }) {
   const stats = [
     { label: 'Total Students', value: recentStudents.length.toString(), delta: '+24 this month', icon: Users, color: 'text-blue-600' },
     { label: 'Active Teachers', value: '86', delta: '98% Attendance', icon: UserSquare2, color: 'text-emerald-600' },
@@ -601,8 +606,14 @@ function DashboardView({ totalMonthlyFee, recentStudents }: { totalMonthlyFee: n
               <CardTitle className="text-base font-bold text-white">Quick Action</CardTitle>
             </CardHeader>
             <CardContent className="flex gap-2 p-4 pt-0">
-              <Button className="flex-1 bg-white/10 hover:bg-white/20 text-[11px] h-9 border-none">Add Student</Button>
-              <Button className="flex-1 bg-white/10 hover:bg-white/20 text-[11px] h-9 border-none">Pay Fees</Button>
+              <Button 
+                onClick={() => setActiveView('students')}
+                className="flex-1 bg-white/10 hover:bg-white/20 text-[11px] h-9 border-none"
+              >Add Student</Button>
+              <Button 
+                onClick={() => setActiveView('fees')}
+                className="flex-1 bg-white/10 hover:bg-white/20 text-[11px] h-9 border-none"
+              >Pay Fees</Button>
             </CardContent>
           </Card>
         </div>
@@ -886,7 +897,8 @@ function TeachersView({
     employeeId: '',
     contactNumber: '',
     baseSalary: '',
-    qualification: ''
+    qualification: '',
+    assignedClass: ''
   });
   
   const [payrollForm, setPayrollForm] = useState({
@@ -907,11 +919,12 @@ function TeachersView({
       contactNumber: staffForm.contactNumber,
       baseSalary: Number(staffForm.baseSalary),
       qualification: staffForm.qualification,
+      assignedClass: staffForm.assignedClass,
       createdAt: new Date().toISOString(),
     };
     onAddTeacher(newStaff);
     setOpenAddStaff(false);
-    setStaffForm({ name: '', designation: '', employeeId: '', contactNumber: '', baseSalary: '', qualification: '' });
+    setStaffForm({ name: '', designation: '', employeeId: '', contactNumber: '', baseSalary: '', qualification: '', assignedClass: '' });
   };
 
   const handleEditStaff = (e: React.FormEvent) => {
@@ -926,6 +939,7 @@ function TeachersView({
       contactNumber: staffForm.contactNumber,
       baseSalary: Number(staffForm.baseSalary),
       qualification: staffForm.qualification,
+      assignedClass: staffForm.assignedClass,
     };
     
     // In a real app we'd call an update function. for now we just add to show it works or the user can refresh
@@ -933,7 +947,7 @@ function TeachersView({
     // Fixed: I'll add onUpdateTeacher or just replace in local state if I had access, but I'll use onAddTeacher for now as a placeholder or assume it handles both
     onAddTeacher(updatedStaff); 
     setSelectedStaff(null);
-    setStaffForm({ name: '', designation: '', employeeId: '', contactNumber: '', baseSalary: '', qualification: '' });
+    setStaffForm({ name: '', designation: '', employeeId: '', contactNumber: '', baseSalary: '', qualification: '', assignedClass: '' });
   };
 
   const handleGeneratePayroll = (e: React.FormEvent) => {
@@ -1085,6 +1099,18 @@ function TeachersView({
                     <Label htmlFor="qual" className="text-right text-xs">Qualification</Label>
                     <Input id="qual" value={staffForm.qualification} onChange={(e) => setStaffForm({...staffForm, qualification: e.target.value})} className="col-span-3 h-8 text-xs" required />
                   </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="assignClass" className="text-right text-xs">Assign Class</Label>
+                    <Select value={staffForm.assignedClass} onValueChange={(v) => setStaffForm({...staffForm, assignedClass: v})}>
+                      <SelectTrigger className="col-span-3 h-8 text-xs">
+                        <SelectValue placeholder="Select Grade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None (Admin/Staff)</SelectItem>
+                        {SCHOOL_CLASSES.map(c => <SelectItem key={c} value={c}>Grade {c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <DialogFooter>
                     <Button type="submit" className="bg-accent h-8 text-xs w-full">Save Staff Member</Button>
                   </DialogFooter>
@@ -1151,7 +1177,8 @@ function TeachersView({
                         employeeId: teacher.employeeId,
                         contactNumber: teacher.contactNumber,
                         baseSalary: teacher.baseSalary?.toString() || '',
-                        qualification: teacher.qualification
+                        qualification: teacher.qualification,
+                        assignedClass: teacher.assignedClass || ''
                       });
                       setSelectedStaff(teacher);
                     }}
@@ -1299,6 +1326,18 @@ function TeachersView({
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="editQual" className="text-right text-xs">Qualification</Label>
               <Input id="editQual" value={staffForm.qualification} onChange={(e) => setStaffForm({...staffForm, qualification: e.target.value})} className="col-span-3 h-8 text-xs" required />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right text-xs">Assign Class</Label>
+              <Select value={staffForm.assignedClass} onValueChange={(v) => setStaffForm({...staffForm, assignedClass: v})}>
+                <SelectTrigger className="col-span-3 h-8 text-xs">
+                  <SelectValue placeholder="Select Grade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (Admin/Staff)</SelectItem>
+                  {SCHOOL_CLASSES.map(c => <SelectItem key={c} value={c}>Grade {c}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button type="submit" className="bg-accent h-8 text-xs w-full">Update Staff Member</Button>
