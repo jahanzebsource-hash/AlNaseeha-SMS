@@ -412,32 +412,47 @@ async function startServer() {
         const fs = await import("fs");
         let sql = fs.readFileSync(schema, "utf8");
         
-        // Add IF NOT EXISTS to all CREATE TABLE statements to avoid errors if some tables already exist
-        sql = sql.replace(/CREATE TABLE/g, "CREATE TABLE IF NOT EXISTS");
+        // schema.sql already has IF NOT EXISTS, so no need to replace
         
         await db.query(sql);
         console.log("Database initialized/updated successfully.");
       }
-    } catch (err) {
-      console.error("Database initialization check failed:", err);
+    } catch (err: any) {
+      console.error("Database initialization check failed. Error:", err.message);
+      // Fallback: try to create school_settings specifically if it's the one blocking
+      try {
+        const db = getPool();
+        if (db) {
+          await db.query(`
+            CREATE TABLE IF NOT EXISTS school_settings (
+                key TEXT PRIMARY KEY,
+                value JSONB NOT NULL,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+          `);
+          console.log("Fallback: school_settings table created/verified.");
+        }
+      } catch (fallbackErr: any) {
+        console.error("Fallback initialization also failed:", fallbackErr.message);
+      }
     }
   }
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
     
-    // Seed default principal if table is empty
+    // Seed default principal if not exists
     const db = getPool();
     if (db) {
-      db.query("SELECT COUNT(*) FROM teachers").then(async (res) => {
-        if (parseInt(res.rows[0].count) === 0) {
+      db.query("SELECT * FROM teachers WHERE login_id = $1", ['jahanzeb']).then(async (res) => {
+        if (res.rows.length === 0) {
           const passHash = await bcrypt.hash("123", 10);
           await db.query(
             `INSERT INTO teachers (id, name, email, role, login_id, password_hash, designation, is_teaching) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            ['u1', 'Muhammad Jahanzeb', 'principal@alnaseeha.edu', 'principal', 'jahanzeb', passHash, 'Principal', false]
+            ['admin_default', 'Muhammad Jahanzeb', 'principal@alnaseeha.edu', 'principal', 'jahanzeb', passHash, 'Principal', false]
           );
-          console.log("Default principal account created: [jahanzeb / 123]");
+          console.log("Default principal account created/verified: [jahanzeb / 123]");
         }
       }).catch(err => console.error("Error seeding principal:", err));
     }

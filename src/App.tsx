@@ -199,7 +199,7 @@ export default function App() {
   }, [students]);
 
   const totalMonthlyFee = useMemo(() => {
-    return students.reduce((sum, student) => sum + student.monthlyFee, 0);
+    return students.reduce((sum, student) => sum + (Number(student.monthlyFee) || 0), 0);
   }, [students]);
 
   const navItems = [
@@ -601,7 +601,7 @@ function DashboardView({ totalMonthlyFee, recentStudents, setActiveView }: { tot
   const stats = [
     { label: 'Total Students', value: recentStudents.length.toString(), delta: '+24 this month', icon: Users, color: 'text-blue-600' },
     { label: 'Active Teachers', value: '86', delta: '98% Attendance', icon: UserSquare2, color: 'text-emerald-600' },
-    { label: 'Monthly Income', value: `Rs.${totalMonthlyFee.toLocaleString()}`, delta: 'Total Fee Demand', icon: CreditCard, color: 'text-amber-600' },
+    { label: 'Monthly Income', value: `Rs. ${totalMonthlyFee.toLocaleString()}`, delta: 'Total Fee Demand', icon: CreditCard, color: 'text-amber-600' },
     { label: 'Daily Attendance', value: '94.2%', delta: 'Trending upwards', icon: CalendarCheck, color: 'text-purple-600' },
   ];
 
@@ -645,7 +645,7 @@ function DashboardView({ totalMonthlyFee, recentStudents, setActiveView }: { tot
                       <td className="px-6 py-3 font-medium text-foreground">{row.name}</td>
                       <td className="px-6 py-3 text-muted-foreground">#{row.rollNumber}</td>
                       <td className="px-6 py-3 text-muted-foreground">{row.grade}</td>
-                      <td className="px-6 py-3 text-muted-foreground">Rs.{row.monthlyFee.toLocaleString()}</td>
+                      <td className="px-6 py-3 text-muted-foreground">Rs. {row.monthlyFee.toLocaleString()}</td>
                       <td className="px-6 py-3">
                         <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">Active</span>
                       </td>
@@ -1898,15 +1898,15 @@ function FeesView({
 
         <table style="width: 100%; margin-top: 12px; font-size: 10px; border: 1px solid #000;">
           <tr style="background: #f0f0f0;"><th style="border: 1px solid #000; padding: 4px; text-align: left;">Description</th><th style="border: 1px solid #000; padding: 4px; text-align: right;">Amount</th></tr>
-          <tr><td style="border: 1px solid #000; padding: 4px;">Tuition Fee</td><td style="border: 1px solid #000; padding: 4px; text-align: right;">Rs.${challan.monthlyFee?.toLocaleString()}</td></tr>
+          <tr><td style="border: 1px solid #000; padding: 4px;">Tuition Fee</td><td style="border: 1px solid #000; padding: 4px; text-align: right;">Rs. ${challan.monthlyFee?.toLocaleString()}</td></tr>
           <tr>
             <td style="border: 1px solid #000; padding: 4px;">
               <strong>Arrears / Previous Dues</strong>
               ${challan.arrearsDescription ? `<br><small style="color:#666;">(${challan.arrearsDescription})</small>` : ''}
             </td>
-            <td style="border: 1px solid #000; padding: 4px; text-align: right;">Rs.${challan.arrears?.toLocaleString()}</td>
+            <td style="border: 1px solid #000; padding: 4px; text-align: right;">Rs. ${challan.arrears?.toLocaleString()}</td>
           </tr>
-          <tr style="font-weight: bold; font-size: 11px;"><td style="border: 1px solid #000; padding: 4px; background: #f0f0f0;">Total Payable</td><td style="border: 1px solid #000; padding: 4px; text-align: right; background: #f0f0f0;">Rs.${challan.totalPayable?.toLocaleString()}</td></tr>
+          <tr style="font-weight: bold; font-size: 11px;"><td style="border: 1px solid #000; padding: 4px; background: #f0f0f0;">Total Payable</td><td style="border: 1px solid #000; padding: 4px; text-align: right; background: #f0f0f0;">Rs. ${challan.totalPayable?.toLocaleString()}</td></tr>
         </table>
 
         <div style="margin-top: 25px; display: flex; justify-content: space-between; font-size: 9px;">
@@ -2004,14 +2004,14 @@ function FeesView({
         <Card className="border border-border shadow-none rounded-xl bg-primary text-white">
           <CardContent className="p-6">
             <p className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-1">Total Monthly Demand</p>
-            <h3 className="text-3xl font-bold">Rs.{students.reduce((sum, s) => sum + s.monthlyFee, 0).toLocaleString()}</h3>
+            <h3 className="text-3xl font-bold">Rs. {students.reduce((sum, s) => sum + (Number(s.monthlyFee) || 0), 0).toLocaleString()}</h3>
             <p className="text-emerald-400 text-[11px] font-bold mt-2">Active Student Fees</p>
           </CardContent>
         </Card>
         <Card className="border border-border shadow-none rounded-xl bg-white">
           <CardContent className="p-6">
             <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider mb-1">Pending Amount</p>
-            <h3 className="text-3xl font-bold text-red-600 font-black tracking-tighter">Rs.{totalPending.toLocaleString()}</h3>
+            <h3 className="text-3xl font-bold text-red-600 font-black tracking-tighter">Rs. {totalPending.toLocaleString()}</h3>
             <p className="text-red-500 text-[11px] font-bold mt-2">{pendingStudents.length} Students Remaining</p>
           </CardContent>
         </Card>
@@ -2099,7 +2099,7 @@ function FeesView({
                         <div className="text-[10px] text-muted-foreground font-normal">Grade: {student.grade} - {student.section}</div>
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">{student.rollNumber}</td>
-                      <td className="px-6 py-4 text-muted-foreground font-bold">Rs.{student.monthlyFee.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-muted-foreground font-bold">Rs. {(Number(student.monthlyFee) || 0).toLocaleString()}</td>
                       <td className="px-6 py-4">
                         <Badge className={currentMonthPaid ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100' : 'bg-red-100 text-red-700 hover:bg-red-100'}>
                           {currentMonthPaid ? 'Paid' : 'Unpaid'}
@@ -2414,8 +2414,8 @@ function FeesView({
                 <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
                   <p className="text-[10px] font-bold text-primary uppercase text-center mb-1 underline">Basic Info</p>
                   <div className="text-[10px] space-y-1">
-                    <p><strong>Monthly:</strong> Rs.{selectedStudent?.monthlyFee.toLocaleString()}</p>
-                    <p><strong>Arrears:</strong> Rs.{selectedStudent?.arrears?.toLocaleString() || '0'}</p>
+                    <p><strong>Monthly:</strong> Rs. {selectedStudent?.monthlyFee.toLocaleString()}</p>
+                    <p><strong>Arrears:</strong> Rs. {selectedStudent?.arrears?.toLocaleString() || '0'}</p>
                   </div>
                 </div>
                 <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 flex flex-col items-center justify-center">
@@ -2424,7 +2424,7 @@ function FeesView({
                 </div>
                 <div className="p-3 bg-red-50 rounded-xl border border-red-100 flex flex-col items-center justify-center">
                   <p className="text-[10px] font-bold text-red-700 uppercase">Arrears Dues</p>
-                  <p className="text-lg font-black text-red-800">Rs.{selectedStudent?.arrears?.toLocaleString() || '0'}</p>
+                  <p className="text-lg font-black text-red-800">Rs. {selectedStudent?.arrears?.toLocaleString() || '0'}</p>
                 </div>
               </div>
               
