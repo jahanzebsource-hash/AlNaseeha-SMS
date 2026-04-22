@@ -30,9 +30,11 @@ let pool: pg.Pool | null = null;
 
 function getPool() {
   if (!pool) {
-    let connectionString = process.env.DATABASE_URL;
+    // Prioritize SUPABASE_DATABASE_URL to avoid conflicts with Vercel auto-injected DATABASE_URL
+    let connectionString = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
+    
     if (!connectionString) {
-      console.error("DATABASE_URL is missing!");
+      console.error("No database connection string found! (Checked SUPABASE_DATABASE_URL and DATABASE_URL)");
       return null;
     }
     
@@ -44,12 +46,12 @@ function getPool() {
         ssl: {
           rejectUnauthorized: false
         },
-        connectionTimeoutMillis: 10000, // 10 seconds timeout
-        max: 20 // Standard limit
+        connectionTimeoutMillis: 15000, // Increased to 15 seconds
+        max: 20
       });
       
       pool.on('error', (err) => {
-        console.error('Unexpected error on idle client', err.message);
+        console.error('Unexpected error on idle client:', err.message);
         pool = null;
       });
       
