@@ -372,8 +372,20 @@ if (db) {
         await db.query(sql);
         console.log("Database initialized.");
       }
+
+      // Ensure principal exists
+      const { rows: teacherRows } = await db.query("SELECT * FROM teachers WHERE login_id = $1", ['jahanzeb']);
+      if (teacherRows.length === 0) {
+        const passHash = await bcrypt.hash("123", 10);
+        await db.query(
+          `INSERT INTO teachers (id, name, email, role, login_id, password_hash, designation, is_teaching) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          ['admin_default', 'Muhammad Jahanzeb', 'principal@alnaseeha.edu', 'principal', 'jahanzeb', passHash, 'Principal', false]
+        );
+        console.log("Default principal account seeded.");
+      }
     } catch (err) {
-      console.error("DB Init failed:", err);
+      console.error("DB Init/Seeding failed:", err);
     }
   })();
 }
