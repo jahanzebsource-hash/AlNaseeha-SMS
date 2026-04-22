@@ -72,27 +72,70 @@ app.get("/api/health", async (req, res) => {
   });
 });
 
+// Ensure database is initialized
+let isInitialized = false;
+async function ensureDbInitialized() {
+  if (isInitialized) return;
+  const db = getPool();
+  if (!db) return;
+
+  try {
+    const { rows } = await db.query("SELECT to_regclass('students') as table_exists");
+    if (!rows[0].table_exists) {
+      console.log("Starting full database initialization...");
+      const schemaPath = path.join(process.cwd(), "schema.sql");
+      const sql = fs.readFileSync(schemaPath, "utf8");
+      await db.query(sql);
+      console.log("Database schema applied successfully.");
+    }
+
+    // Always ensure principal exists on every initialization check
+    const { rows: teacherRows } = await db.query("SELECT * FROM teachers WHERE login_id = $1", ['jahanzeb']);
+    if (teacherRows.length === 0) {
+      console.log("Seeding principal account...");
+      const passHash = await bcrypt.hash("123", 10);
+      await db.query(
+        `INSERT INTO teachers (id, name, email, role, login_id, password_hash, designation, is_teaching) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        ['admin_default', 'Muhammad Jahanzeb', 'principal@alnaseeha.edu', 'principal', 'jahanzeb', passHash, 'Principal', false]
+      );
+      console.log("Principal account 'jahanzeb' created successfully.");
+    }
+    isInitialized = true;
+  } catch (err: any) {
+    console.error("Database initialization/seeding failed:", err.message);
+    throw err;
+  }
+}
+
 // Auth
 app.post("/api/login", async (req, res) => {
-  const db = getPool();
-  if (!db) return res.status(503).json({ error: "Database not configured" });
-  const { loginId, password } = req.body;
   try {
+    await ensureDbInitialized();
+    const db = getPool();
+    if (!db) return res.status(503).json({ error: "Database not configured" });
+    
+    const { loginId, password } = req.body;
     const result = await db.query("SELECT * FROM teachers WHERE login_id = $1", [loginId]);
+    
     if (result.rows.length === 0) {
+      console.log(`Login failed: User '${loginId}' not found in database.`);
       return res.status(401).json({ error: "Invalid login ID or password" });
     }
+    
     const user = result.rows[0];
     const isValid = await bcrypt.compare(password, user.password_hash);
     if (!isValid) {
+      console.log(`Login failed: Incorrect password for user '${loginId}'.`);
       return res.status(401).json({ error: "Invalid login ID or password" });
     }
+    
     const profile = toCamelCase([user])[0];
     delete profile.passwordHash;
     res.json(profile);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+  } catch (err: any) {
+    console.error("Login route error:", err.message);
+    res.status(500).json({ error: "Internal Server Error or DB Connection issue" });
   }
 });
 
@@ -358,36 +401,6 @@ app.post("/api/settings", async (req, res) => {
   }
 });
 
-// Initialization (Only if DB connected)
-const db = getPool();
-if (db) {
-  // We don't want to block the request, so we runs this async
-  (async () => {
-    try {
-      const { rows: studentsRows } = await db.query("SELECT to_regclass('public.students') as table_exists");
-      if (!studentsRows[0].table_exists) {
-        console.log("Initializing database...");
-        const schema = path.join(process.cwd(), "schema.sql");
-        const sql = fs.readFileSync(schema, "utf8");
-        await db.query(sql);
-        console.log("Database initialized.");
-      }
 
-      // Ensure principal exists
-      const { rows: teacherRows } = await db.query("SELECT * FROM teachers WHERE login_id = $1", ['jahanzeb']);
-      if (teacherRows.length === 0) {
-        const passHash = await bcrypt.hash("123", 10);
-        await db.query(
-          `INSERT INTO teachers (id, name, email, role, login_id, password_hash, designation, is_teaching) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          ['admin_default', 'Muhammad Jahanzeb', 'principal@alnaseeha.edu', 'principal', 'jahanzeb', passHash, 'Principal', false]
-        );
-        console.log("Default principal account seeded.");
-      }
-    } catch (err) {
-      console.error("DB Init/Seeding failed:", err);
-    }
-  })();
-}
 
 export default app;
