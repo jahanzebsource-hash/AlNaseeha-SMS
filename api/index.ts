@@ -79,6 +79,18 @@ function getPool() {
 const app = express();
 app.use(express.json());
 
+app.use(async (req, res, next) => {
+  if (!isInitialized) {
+    try {
+      await ensureDbInitialized();
+      isInitialized = true;
+    } catch (err: any) {
+      console.error("Critical: Initialization failed", err.message);
+    }
+  }
+  next();
+});
+
 // API Routes
 app.get("/api/db-debug", (req, res) => {
   const sbUrl = process.env.SUPABASE_DATABASE_URL;
@@ -141,7 +153,7 @@ async function ensureDbInitialized() {
     } else {
       // Table exists but might be old. Surgically add missing columns
       console.log("Verifying teacher table columns...");
-      const migrations = [
+      const teacherMigrations = [
         "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS login_id VARCHAR(100) UNIQUE",
         "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS password_hash TEXT",
         "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'teacher'",
@@ -149,11 +161,23 @@ async function ensureDbInitialized() {
         "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS designation VARCHAR(100)",
         "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS contact_number VARCHAR(50)"
       ];
-      for (let sql of migrations) {
+      for (let sql of teacherMigrations) {
         try {
           await db.query(sql);
         } catch (e: any) {
-          if (!e.message.includes('already exists')) console.error("Migration error:", e.message);
+          if (!e.message.includes('already exists')) console.error("Teacher migration error:", e.message);
+        }
+      }
+
+      console.log("Verifying student table columns...");
+      const studentMigrations = [
+        "ALTER TABLE students ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE"
+      ];
+      for (let sql of studentMigrations) {
+        try {
+          await db.query(sql);
+        } catch (e: any) {
+          if (!e.message.includes('already exists')) console.error("Student migration error:", e.message);
         }
       }
     }
@@ -243,20 +267,33 @@ app.get("/api/students", async (req, res) => {
 app.post("/api/students", async (req, res) => {
   const db = getPool();
   if (!db) return res.status(503).json({ error: "Database not configured" });
-  const { id, name, email, rollNumber, grade, section, parentName, parentContact, address, dateOfBirth, monthlyFee, arrears } = req.body;
+  const { id, name, email, rollNumber, grade, section, parentName, parentContact, address, dateOfBirth, monthlyFee, arrears, isActive } = req.body;
   try {
     const result = await db.query(
-      `INSERT INTO students (id, name, email, roll_number, grade, section, parent_name, parent_contact, address, date_of_birth, monthly_fee, arrears) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) 
+      `INSERT INTO students (id, name, email, roll_number, grade, section, parent_name, parent_contact, address, date_of_birth, monthly_fee, arrears, is_active) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) 
        ON CONFLICT (id) DO UPDATE SET 
-       name=$2, email=$3, roll_number=$4, grade=$5, section=$6, parent_name=$7, parent_contact=$8, address=$9, date_of_birth=$10, monthly_fee=$11, arrears=$12
+       name=$2, email=$3, roll_number=$4, grade=$5, section=$6, parent_name=$7, parent_contact=$8, address=$9, date_of_birth=$10, monthly_fee=$11, arrears=$12, is_active=$13
        RETURNING *`,
-      [id || Math.random().toString(36).substr(2, 9), name, email, rollNumber, grade, section, parentName, parentContact, address, dateOfBirth, monthlyFee, arrears || 0]
+      [id || Math.random().toString(36).substr(2, 9), name, email, rollNumber, grade, section, parentName, parentContact, address, dateOfBirth, monthlyFee, arrears || 0, isActive !== undefined ? isActive : true]
     );
     res.status(201).json(toCamelCase(result.rows)[0]);
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err.message || "Internal Server Error" });
+  }
+});
+
+app.delete("/api/students/:id", async (req, res) => {
+  const db = getPool();
+  if (!db) return res.status(503).json({ error: "Database not configured" });
+  const { id } = req.params;
+  try {
+    await db.query("DELETE FROM students WHERE id = $1", [id]);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 
@@ -267,9 +304,9 @@ app.get("/api/teachers", async (req, res) => {
   try {
     const result = await db.query("SELECT * FROM teachers ORDER BY name ASC");
     res.json(toCamelCase(result.rows));
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 
@@ -313,9 +350,9 @@ app.post("/api/teachers", async (req, res) => {
     const profile = toCamelCase(result.rows)[0];
     delete profile.passwordHash;
     res.status(201).json(profile);
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 
@@ -331,9 +368,9 @@ app.get("/api/fees", async (req, res) => {
       ORDER BY f.payment_date DESC
     `);
     res.json(toCamelCase(result.rows));
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 
@@ -351,9 +388,9 @@ app.post("/api/fees", async (req, res) => {
       [id || Math.random().toString(36).substr(2, 9), studentId, amount, paymentDate, month, year, status]
     );
     res.status(201).json(toCamelCase(result.rows)[0]);
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 
@@ -364,9 +401,9 @@ app.get("/api/transactions", async (req, res) => {
   try {
     const result = await db.query("SELECT * FROM transactions ORDER BY date DESC");
     res.json(toCamelCase(result.rows));
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 
@@ -384,9 +421,9 @@ app.post("/api/transactions", async (req, res) => {
       [id || Math.random().toString(36).substr(2, 9), type, category, amount, description, date, month, year, studentId]
     );
     res.status(201).json(toCamelCase(result.rows)[0]);
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 
@@ -405,9 +442,9 @@ app.post("/api/attendance", async (req, res) => {
       [entityId, entityType, status, date, remarks]
     );
     res.json(result.rows[0]);
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 
@@ -417,9 +454,9 @@ app.get("/api/attendance", async (req, res) => {
   try {
     const result = await db.query("SELECT * FROM attendance ORDER BY date DESC");
     res.json(toCamelCase(result.rows));
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 
@@ -430,9 +467,9 @@ app.get("/api/inventory", async (req, res) => {
   try {
     const result = await db.query("SELECT * FROM inventory ORDER BY item_name ASC");
     res.json(toCamelCase(result.rows));
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 
@@ -450,9 +487,9 @@ app.post("/api/inventory", async (req, res) => {
       [id || Math.random().toString(36).substr(2, 9), itemName, category, purchasePrice, salePrice, stockQuantity, unit, minQuantity]
     );
     res.status(201).json(toCamelCase(result.rows)[0]);
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 
@@ -467,9 +504,9 @@ app.get("/api/settings", async (req, res) => {
       settingsMap[row.key] = row.value;
     });
     res.json(settingsMap);
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 
@@ -483,9 +520,9 @@ app.post("/api/settings", async (req, res) => {
       [key, JSON.stringify(value)]
     );
     res.json({ success: true });
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 

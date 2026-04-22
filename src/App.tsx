@@ -92,17 +92,6 @@ import {
 import { authService } from './services/authService';
 import { smartDB } from './services/smartDB';
 import { isCloudEnabled } from './services/firebase';
-import { 
-  mockStudents, 
-  mockTeachers, 
-  mockAnnouncements, 
-  mockAttendance, 
-  mockFees,
-  mockTransactions,
-  mockInventory,
-  mockVendors,
-  mockVendorPayments
-} from './lib/mockData';
 
 type View = 'dashboard' | 'students' | 'teachers' | 'attendance' | 'fees' | 'exams' | 'announcements' | 'finance' | 'cashbook' | 'inventory' | 'timetable' | 'session' | 'balancesheet';
 
@@ -133,17 +122,24 @@ export default function App() {
   const [user, setUser] = useState<UserProfile | null>(authService.getCurrentUser());
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [students, setStudents] = useState<Student[]>(mockStudents);
-  const [teachers, setTeachers] = useState<Teacher[]>(mockTeachers);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [payroll, setPayroll] = useState<PayrollRecord[]>([]);
-  const [attendance, setAttendance] = useState<Attendance[]>(mockAttendance as Attendance[]);
-  const [feeRecords, setFeeRecords] = useState<FeeRecord[]>(mockFees as FeeRecord[]);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [feeRecords, setFeeRecords] = useState<FeeRecord[]>([]);
   const [feeChallans, setFeeChallans] = useState<FeeChallan[]>([]);
-  const [transactions, setTransactions] = useState<FinanceTransaction[]>(mockTransactions);
-  const [inventory, setInventory] = useState<InventoryItem[]>(mockInventory);
+  const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [invoices, setInvoices] = useState<InventoryInvoice[]>([]);
-  const [vendors, setVendors] = useState<Vendor[]>(mockVendors);
-  const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>(mockVendorPayments);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>([]);
+
+  const onDeleteStudent = async (id: string) => {
+    if (confirm('Are you sure you want to delete this student? All records will be removed.')) {
+      await smartDB.deleteRecord('students', id);
+      setStudents(prev => prev.filter(s => s.id !== id));
+    }
+  };
   const [timetableSlots, setTimetableSlots] = useState<TimetableSlot[]>([]);
   const [timetableEntries, setTimetableEntries] = useState<TimetableEntry[]>([]);
   const [openingBalance, setOpeningBalance] = useState<number>(0);
@@ -193,7 +189,7 @@ export default function App() {
 
   // Auto-sync effect (Simplified example for students)
   useEffect(() => {
-    if (students !== mockStudents) {
+    if (students.length > 0) {
       students.forEach(s => smartDB.saveRecord('students', s));
     }
   }, [students]);
@@ -229,7 +225,8 @@ export default function App() {
 
   const renderView = () => {
     if (user?.role === 'student') {
-      const studentData = students.find(s => s.email === user.email) || mockStudents[0];
+      const studentData = students.find(s => s.email === user.email);
+      if (!studentData) return <div className="p-8 text-center">No student record found for your account.</div>;
       return <StudentDashboardView student={studentData} />;
     }
 
@@ -241,7 +238,7 @@ export default function App() {
       case 'dashboard':
         return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} setActiveView={setActiveView} />;
       case 'students':
-        return <StudentsView students={displayStudents} onAddStudent={(s) => setStudents(prev => prev.some(item => item.id === s.id) ? prev.map(item => item.id === s.id ? s : item) : [...prev, s])} />;
+        return <StudentsView students={displayStudents} onAddStudent={(s) => setStudents(prev => prev.some(item => item.id === s.id) ? prev.map(item => item.id === s.id ? s : item) : [...prev, s])} onDeleteStudent={onDeleteStudent} />;
       case 'teachers':
         return (
           <TeachersView 
@@ -713,7 +710,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
-function StudentsView({ students, onAddStudent }: { students: Student[], onAddStudent: (s: Student) => void }) {
+function StudentsView({ students, onAddStudent, onDeleteStudent }: { students: Student[], onAddStudent: (s: Student) => void, onDeleteStudent: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [filterClass, setFilterClass] = useState('all');
@@ -745,13 +742,14 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
     rollNumber: '',
     arrears: '',
     arrearsDescription: '',
+    isActive: true
   });
 
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
     if (!isOpen) {
       setEditingStudent(null);
-      setFormData({ name: '', parentName: '', parentContact: '', dateOfBirth: '', monthlyFee: '', grade: '', section: '', rollNumber: '', arrears: '', arrearsDescription: '' });
+      setFormData({ name: '', parentName: '', parentContact: '', dateOfBirth: '', monthlyFee: '', grade: '', section: '', rollNumber: '', arrears: '', arrearsDescription: '', isActive: true });
     }
   };
 
@@ -762,12 +760,13 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
       parentName: student.parentName,
       parentContact: student.parentContact,
       dateOfBirth: student.dateOfBirth,
-      monthlyFee: student.monthlyFee.toString(),
+      monthlyFee: (Number(student.monthlyFee) || 0).toString(),
       grade: student.grade,
       section: student.section,
       rollNumber: student.rollNumber,
-      arrears: (student.arrears || 0).toString(),
+      arrears: (Number(student.arrears) || 0).toString(),
       arrearsDescription: student.arrearsDescription || '',
+      isActive: student.isActive !== false
     });
     setOpen(true);
   };
@@ -788,11 +787,17 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
       rollNumber: formData.rollNumber,
       arrears: Number(formData.arrears) || 0,
       arrearsDescription: formData.arrearsDescription,
+      isActive: formData.isActive,
       address: editingStudent?.address || '',
       createdAt: editingStudent?.createdAt || new Date().toISOString(),
     };
     onAddStudent(updatedStudent);
     handleOpenChange(false);
+  };
+
+  const toggleStatus = (student: Student) => {
+    const updated = { ...student, isActive: !student.isActive };
+    onAddStudent(updated);
   };
 
   return (
@@ -921,29 +926,58 @@ function StudentsView({ students, onAddStudent }: { students: Student[], onAddSt
                 <th className="px-6 py-4">Grade</th>
                 <th className="px-6 py-4">Parent Name</th>
                 <th className="px-6 py-4">Fee</th>
-                <th className="px-6 py-4 no-print">Actions</th>
+                <th className="px-6 py-4 no-print text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filteredStudents.map((student) => (
-                <tr key={student.id} className="hover:bg-background transition-colors">
+                <tr key={student.id} className={cn("hover:bg-background transition-colors", student.isActive === false && "bg-red-50/30 opacity-70")}>
                   <td className="px-6 py-4 flex items-center gap-3">
                     <Avatar className="h-7 w-7 no-print">
                       <AvatarFallback className="text-[10px]">{student.name.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <span className="font-semibold text-foreground">{student.name}</span>
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-foreground flex items-center gap-2">
+                        {student.name}
+                        {student.isActive === false && <Badge variant="destructive" className="text-[8px] h-4 px-1">Inactive</Badge>}
+                      </span>
+                      <span className="text-[9px] text-muted-foreground">{student.parentName}</span>
+                    </div>
                   </td>
-                  <td className="px-6 py-4 text-muted-foreground">{student.rollNumber}</td>
+                  <td className="px-6 py-4 text-muted-foreground font-mono">{student.rollNumber}</td>
                   <td className="px-6 py-4 text-muted-foreground">{student.grade} - {student.section}</td>
                   <td className="px-6 py-4 text-muted-foreground">{student.parentName}</td>
-                  <td className="px-6 py-4 text-muted-foreground font-bold">Rs.{student.monthlyFee}</td>
-                  <td className="px-6 py-4 no-print">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handleEdit(student)}
-                      className="text-accent hover:text-accent/80 hover:bg-accent/10 text-[11px] h-7"
-                    >Edit</Button>
+                  <td className="px-6 py-4 text-muted-foreground font-bold">Rs.{(Number(student.monthlyFee) || 0).toLocaleString()}</td>
+                  <td className="px-6 py-4 no-print text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => toggleStatus(student)}
+                        className={cn("h-7 w-7", student.isActive === false ? "text-emerald-600 hover:bg-emerald-50" : "text-amber-500 hover:bg-amber-50")}
+                        title={student.isActive === false ? "Activate Student" : "Deactivate Student"}
+                      >
+                        <RefreshCw size={14} className={student.isActive === false ? "" : "opacity-50"} />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => handleEdit(student)}
+                        className="h-7 w-7 text-accent hover:bg-accent/10"
+                        title="Edit Student"
+                      >
+                        <Edit size={14} />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => onDeleteStudent(student.id)}
+                        className="h-7 w-7 text-red-500 hover:bg-red-50"
+                        title="Delete Student"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1810,6 +1844,7 @@ function FeesView({
     const currentYear = new Date().getFullYear();
     
     return students.filter(s => {
+      if (s.isActive === false) return false;
       const isPaid = feeRecords.some(r => 
         r.studentId === s.id && 
         r.month === currentMonth && 
@@ -1820,7 +1855,32 @@ function FeesView({
     });
   }, [students, feeRecords]);
 
-  const totalPending = pendingStudents.reduce((sum, s) => sum + s.monthlyFee, 0);
+  const totalPending = useMemo(() => {
+    return pendingStudents.reduce((sum, s) => sum + (Number(s.monthlyFee) || 0), 0);
+  }, [pendingStudents]);
+
+  const generateIndividualChallan = (student: Student) => {
+    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+    const currentYear = new Date().getFullYear();
+    const issueDate = new Date().toISOString().split('T')[0];
+    const dueDate = new Date(new Date().getFullYear(), new Date().getMonth(), 10).toISOString().split('T')[0];
+
+    const total = (Number(student.monthlyFee) || 0) + (Number(student.arrears) || 0);
+    const newChallan: FeeChallan = {
+      id: `CH-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+      studentId: student.id,
+      month: currentMonth,
+      year: currentYear,
+      issueDate,
+      dueDate,
+      monthlyFee: (Number(student.monthlyFee) || 0),
+      arrears: (Number(student.arrears) || 0),
+      totalPayable: total,
+      status: 'issued'
+    };
+    onSaveChallans([newChallan]);
+    alert(`Challan generated for ${student.name}`);
+  };
 
   const handleRecordFee = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2107,12 +2167,20 @@ function FeesView({
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => generateIndividualChallan(student)}
+                            className="h-7 text-[10px] uppercase font-bold tracking-widest border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                          >
+                            <Receipt size={14} className="mr-2" /> Challan
+                          </Button>
                           <Button 
                             variant="outline" 
                             size="sm" 
                             onClick={() => {
                               setSelectedStudent(student);
-                              setFeeForm({ ...feeForm, amount: student.monthlyFee.toString() });
+                              setFeeForm({ ...feeForm, amount: (Number(student.monthlyFee) || 0).toString() });
                               setOpenRecord(true);
                             }}
                             className="text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 h-7 text-[10px] font-bold"
@@ -2126,32 +2194,6 @@ function FeesView({
                             }}
                             className="text-primary hover:text-white hover:bg-primary border-primary/20 h-7 text-[10px] font-bold"
                           >Ledger</Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => {
-                              const currentMonth = new Date().toLocaleString('default', { month: 'long' });
-                              const currentYear = new Date().getFullYear();
-                              const issueDate = new Date().toISOString().split('T')[0];
-                              const dueDate = new Date(new Date().getFullYear(), new Date().getMonth(), 10).toISOString().split('T')[0];
-                              const c: FeeChallan = {
-                                id: `CH-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
-                                studentId: student.id,
-                                month: currentMonth,
-                                year: currentYear,
-                                monthlyFee: student.monthlyFee,
-                                arrears: student.arrears || 0,
-                                arrearsDescription: student.arrearsDescription,
-                                totalPayable: student.monthlyFee + (student.arrears || 0),
-                                issueDate,
-                                dueDate,
-                                status: 'issued'
-                              };
-                              onSaveChallans([c]);
-                              setActiveTab('challans');
-                            }}
-                            className="text-muted-foreground h-7 text-[10px]"
-                          ><Printer size={14} /></Button>
                         </div>
                       </td>
                     </tr>
@@ -4696,7 +4738,7 @@ function AnnouncementsView() {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {mockAnnouncements.map((ann) => (
+          {[].map((ann: any) => (
             <Card key={ann.id} className="bg-background border border-border shadow-none rounded-xl hover:border-accent transition-all">
               <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">
@@ -4867,7 +4909,7 @@ function StudentDashboardView({ student }: { student: Student }) {
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-border">
-            {mockAnnouncements.map(ann => (
+            {[].map((ann: any) => (
               <div key={ann.id} className="p-6 hover:bg-accent/5 transition-colors group">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-bold text-foreground group-hover:text-accent transition-colors">{ann.title}</h4>

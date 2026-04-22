@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS students (
     address TEXT,
     date_of_birth DATE,
     admission_date DATE DEFAULT CURRENT_DATE,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -9,6 +9,7 @@ export interface UserProfile {
   assignedClass?: string; // For teachers to see only their class
   loginId?: string;
   isTeaching?: boolean;
+  isActive?: boolean;
   createdAt: string;
 }
 
@@ -24,6 +25,7 @@ export interface Student extends UserProfile {
   monthlyFee: number;
   arrears?: number;
   arrearsDescription?: string;
+  isActive?: boolean;
 }
 
 export interface Teacher extends UserProfile {

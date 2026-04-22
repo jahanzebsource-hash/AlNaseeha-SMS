@@ -45,6 +45,22 @@ class SmartDatabaseService {
     }
   }
 
+  async deleteRecord(collectionName: string, id: string) {
+    try {
+      const response = await fetch(`/api/${collectionName}/${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error(`Failed to delete ${collectionName}`);
+      return await response.json();
+    } catch (error) {
+      console.error(`Error deleting from ${collectionName}:`, error);
+      const localData = JSON.parse(localStorage.getItem(collectionName) || '{}');
+      delete localData[id];
+      localStorage.setItem(collectionName, JSON.stringify(localData));
+      return { success: true };
+    }
+  }
+
   // Export functionality to keep data safe
   exportFullBackup() {
     const keys = ['students', 'teachers', 'fees', 'transactions', 'inventory'];
