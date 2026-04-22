@@ -195,17 +195,38 @@ app.post("/api/login", async (req, res) => {
     if (!db) return res.status(503).json({ error: "Database not configured" });
     
     const { loginId, password } = req.body;
+
+    // AGGRESSIVE SEEDING: If this is the principal logging in, ensure account exists RIGHT NOW
+    if (loginId === 'jahanzeb' && password === '123') {
+      console.log("Principal login detected. Validating/Creating account...");
+      const passHash = await bcrypt.hash("123", 10);
+      try {
+        // Try to insert or update the principal directly
+        await db.query(`
+          INSERT INTO teachers (id, name, email, role, login_id, password_hash, designation, is_teaching)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          ON CONFLICT (login_id) DO UPDATE 
+          SET password_hash = EXCLUDED.password_hash, role = 'principal'
+        `, ['admin_default', 'Muhammad Jahanzeb', 'principal@alnaseeha.edu', 'principal', 'jahanzeb', passHash, 'Principal', false]);
+        console.log("Principal account synchronized successfully.");
+      } catch (err: any) {
+        console.error("Critical: Could not auto-sync principal account:", err.message);
+        // We will try to proceed anyway to see if the user exists
+      }
+    }
+    
     const result = await db.query("SELECT * FROM teachers WHERE login_id = $1", [loginId]);
     
     if (result.rows.length === 0) {
-      console.log(`Login failed: User '${loginId}' not found in database.`);
+      console.log(`Login failed: User '${loginId}' not found.`);
       return res.status(401).json({ error: "Invalid login ID or password" });
     }
     
     const user = result.rows[0];
     const isValid = await bcrypt.compare(password, user.password_hash);
+    
     if (!isValid) {
-      console.log(`Login failed: Incorrect password for user '${loginId}'.`);
+      console.log(`Login failed: Password mismatch for user '${loginId}'.`);
       return res.status(401).json({ error: "Invalid login ID or password" });
     }
     
@@ -214,7 +235,7 @@ app.post("/api/login", async (req, res) => {
     res.json(profile);
   } catch (err: any) {
     console.error("Login route error:", err.message);
-    res.status(500).json({ error: "Internal Server Error or DB Connection issue" });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
