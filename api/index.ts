@@ -30,33 +30,46 @@ let pool: pg.Pool | null = null;
 
 function getPool() {
   if (!pool) {
-    // Prioritize SUPABASE_DATABASE_URL to avoid conflicts with Vercel auto-injected DATABASE_URL
-    let connectionString = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
+    const sbUrl = process.env.SUPABASE_DATABASE_URL;
+    const dbUrl = process.env.DATABASE_URL;
     
+    let connectionString = sbUrl || dbUrl;
+    
+    if (sbUrl) console.log("Using SUPABASE_DATABASE_URL.");
+    else if (dbUrl) console.log("Using DATABASE_URL.");
+
     if (!connectionString) {
-      console.error("No database connection string found! (Checked SUPABASE_DATABASE_URL and DATABASE_URL)");
+      console.error("No database connection string found!");
       return null;
     }
     
     connectionString = connectionString.replace(/['"]/g, '').trim();
 
+    // Security & Stability: If Supabase direct port 5432 is found, warn the user
+    if (connectionString.includes('supabase.co') && connectionString.includes(':5432')) {
+       console.warn("CRITICAL: Port 5432 detected for Supabase. This will likely fail on Vercel. Please use Pooler (port 6543).");
+    }
+
     try {
+      const maskedUrl = connectionString.replace(/:([^:@]+)@/, ':****@');
+      console.log(`Attempting connection to: ${maskedUrl}`);
+
       pool = new Pool({
         connectionString,
         ssl: {
           rejectUnauthorized: false
         },
-        connectionTimeoutMillis: 15000, // Increased to 15 seconds
-        max: 20
+        connectionTimeoutMillis: 20000, // 20 seconds
+        max: 10
       });
       
       pool.on('error', (err) => {
-        console.error('Unexpected error on idle client:', err.message);
+        console.error('Pool Error:', err.message);
         pool = null;
       });
       
     } catch (err: any) {
-      console.error("Failed to initialize PG Pool:", err.message);
+      console.error("Pool initialization Failed:", err.message);
       return null;
     }
   }
@@ -67,6 +80,23 @@ const app = express();
 app.use(express.json());
 
 // API Routes
+app.get("/api/db-debug", (req, res) => {
+  const sbUrl = process.env.SUPABASE_DATABASE_URL;
+  const dbUrl = process.env.DATABASE_URL;
+  
+  const mask = (url?: string) => url ? url.replace(/:([^:@]+)@/, ':****@') : null;
+  
+  res.json({
+    hasSupabaseUrl: !!sbUrl,
+    hasDatabaseUrl: !!dbUrl,
+    supabaseUrlMasked: mask(sbUrl),
+    databaseUrlMasked: mask(dbUrl),
+    effectiveUrlMasked: mask(sbUrl || dbUrl),
+    nodeVersion: process.version,
+    env: process.env.NODE_ENV
+  });
+});
+
 app.get("/api/health", async (req, res) => {
   const db = getPool();
   let dbStatus = false;
