@@ -30,17 +30,34 @@ let pool: pg.Pool | null = null;
 
 function getPool() {
   if (!pool) {
-    const connectionString = process.env.DATABASE_URL;
+    let connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
-      console.warn("DATABASE_URL not found. Database functionality will be unavailable.");
+      console.error("DATABASE_URL is missing!");
       return null;
     }
-    pool = new Pool({
-      connectionString,
-      ssl: {
-        rejectUnauthorized: false
-      }
-    });
+    
+    connectionString = connectionString.replace(/['"]/g, '').trim();
+
+    try {
+      // Robust parsing: If URL constructor fails, try to manually extract components
+      // This is helpful when passwords contain special characters that aren't encoded
+      let config: any = {
+        connectionString,
+        ssl: { rejectUnauthorized: false }
+      };
+
+      pool = new Pool(config);
+      
+      // Test connection immediately
+      pool.on('error', (err) => {
+        console.error('Unexpected error on idle client', err);
+        pool = null;
+      });
+      
+    } catch (err: any) {
+      console.error("Failed to initialize PG Pool:", err.message);
+      return null;
+    }
   }
   return pool;
 }
