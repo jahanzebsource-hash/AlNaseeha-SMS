@@ -123,67 +123,55 @@ app.get("/api/health", async (req, res) => {
 // Ensure database is initialized
 let isInitialized = false;
 async function ensureDbInitialized() {
-  if (isInitialized) return;
   const db = getPool();
   if (!db) return;
 
   try {
+    // Check for teachers table existence
     const { rows } = await db.query("SELECT to_regclass('teachers') as table_exists");
     
-    // Check if table exists or missing crucial login_id column
-    let needsInit = !rows[0].table_exists;
-    
-    if (!needsInit) {
-      const { rows: colRows } = await db.query(
-        "SELECT column_name FROM information_schema.columns WHERE table_name = 'teachers' AND column_name = 'login_id'"
-      );
-      if (colRows.length === 0) {
-        console.log("Detected missing login_id column. Adding it surgically...");
-        try {
-          await db.query("ALTER TABLE teachers ADD COLUMN IF NOT EXISTS login_id VARCHAR(100) UNIQUE");
-          await db.query("ALTER TABLE teachers ADD COLUMN IF NOT EXISTS password_hash TEXT");
-          await db.query("ALTER TABLE teachers ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'teacher'");
-        } catch (alterErr: any) {
-          console.error("Manual column migration failed:", alterErr.message);
-        }
-      }
-    }
-
-    if (needsInit) {
-      console.log("Applying/Updating database schema...");
+    if (!rows[0].table_exists) {
+      console.log("Database missing. Initializing full schema...");
       const schemaPath = path.join(process.cwd(), "schema.sql");
       const sql = fs.readFileSync(schemaPath, "utf8");
-      
-      // Split by semicolon and run each statement, ignoring "already exists" errors
       const statements = sql.split(';').filter(s => s.trim() !== '');
-      for (let statement of statements) {
+      for (let s of statements) {
+        try { await db.query(s); } catch (e) {} 
+      }
+    } else {
+      // Table exists but might be old. Surgically add missing columns
+      console.log("Verifying teacher table columns...");
+      const migrations = [
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS login_id VARCHAR(100) UNIQUE",
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS password_hash TEXT",
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'teacher'",
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_teaching BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS designation VARCHAR(100)",
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS contact_number VARCHAR(50)"
+      ];
+      for (let sql of migrations) {
         try {
-          await db.query(statement);
-        } catch (sErr: any) {
-          if (!sErr.message.includes('already exists')) {
-             console.error("Schema statement failed:", sErr.message);
-          }
+          await db.query(sql);
+        } catch (e: any) {
+          if (!e.message.includes('already exists')) console.error("Migration error:", e.message);
         }
       }
-      console.log("Database schema process completed.");
     }
 
-    // Always ensure principal exists
-    const { rows: teacherRows } = await db.query("SELECT * FROM teachers WHERE login_id = $1", ['jahanzeb']);
-    if (teacherRows.length === 0) {
-      console.log("Seeding principal account...");
+    // Always ensure principal jahanzeb exists
+    const { rows: tRows } = await db.query("SELECT * FROM teachers WHERE login_id = $1", ['jahanzeb']);
+    if (tRows.length === 0) {
       const passHash = await bcrypt.hash("123", 10);
       await db.query(
         `INSERT INTO teachers (id, name, email, role, login_id, password_hash, designation, is_teaching) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         ['admin_default', 'Muhammad Jahanzeb', 'principal@alnaseeha.edu', 'principal', 'jahanzeb', passHash, 'Principal', false]
       );
-      console.log("Principal account 'jahanzeb' created.");
+      console.log("Principal account seeded.");
     }
     isInitialized = true;
   } catch (err: any) {
-    console.error("Database initialization/seeding failed:", err.message);
-    throw err;
+    console.error("Critical DB Init Failure:", err.message);
   }
 }
 
