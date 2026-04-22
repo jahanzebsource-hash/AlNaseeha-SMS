@@ -138,8 +138,14 @@ async function ensureDbInitialized() {
         "SELECT column_name FROM information_schema.columns WHERE table_name = 'teachers' AND column_name = 'login_id'"
       );
       if (colRows.length === 0) {
-        console.log("Detected missing login_id column. Re-initializing schema...");
-        needsInit = true;
+        console.log("Detected missing login_id column. Adding it surgically...");
+        try {
+          await db.query("ALTER TABLE teachers ADD COLUMN IF NOT EXISTS login_id VARCHAR(100) UNIQUE");
+          await db.query("ALTER TABLE teachers ADD COLUMN IF NOT EXISTS password_hash TEXT");
+          await db.query("ALTER TABLE teachers ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'teacher'");
+        } catch (alterErr: any) {
+          console.error("Manual column migration failed:", alterErr.message);
+        }
       }
     }
 
