@@ -1286,11 +1286,11 @@ function TeachersView({
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="loginId" className="text-right text-xs">Login ID</Label>
-                    <Input id="loginId" value={staffForm.loginId} onChange={(e) => setStaffForm({...staffForm, loginId: e.target.value})} className="col-span-3 h-8 text-xs" placeholder="e.g. jameel_123" required />
+                    <Input id="loginId" value={staffForm.loginId} onChange={(e) => setStaffForm({...staffForm, loginId: e.target.value})} className="col-span-3 h-8 text-xs" placeholder="e.g. jameel_123" required autoComplete="one-time-code" />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="pass" className="text-right text-xs">Password</Label>
-                    <Input id="pass" type="password" value={staffForm.password} onChange={(e) => setStaffForm({...staffForm, password: e.target.value})} className="col-span-3 h-8 text-xs" placeholder="••••••••" required />
+                    <Input id="pass" type="password" value={staffForm.password} onChange={(e) => setStaffForm({...staffForm, password: e.target.value})} className="col-span-3 h-8 text-xs" placeholder="••••••••" required autoComplete="new-password" />
                   </div>
                    <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="qual" className="text-right text-xs">Qualification</Label>
