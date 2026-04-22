@@ -128,16 +128,30 @@ async function ensureDbInitialized() {
   if (!db) return;
 
   try {
-    const { rows } = await db.query("SELECT to_regclass('students') as table_exists");
-    if (!rows[0].table_exists) {
-      console.log("Starting full database initialization...");
+    const { rows } = await db.query("SELECT to_regclass('teachers') as table_exists");
+    
+    // Check if table exists or missing crucial login_id column
+    let needsInit = !rows[0].table_exists;
+    
+    if (!needsInit) {
+      const { rows: colRows } = await db.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'teachers' AND column_name = 'login_id'"
+      );
+      if (colRows.length === 0) {
+        console.log("Detected missing login_id column. Re-initializing schema...");
+        needsInit = true;
+      }
+    }
+
+    if (needsInit) {
+      console.log("Applying/Updating database schema...");
       const schemaPath = path.join(process.cwd(), "schema.sql");
       const sql = fs.readFileSync(schemaPath, "utf8");
       await db.query(sql);
       console.log("Database schema applied successfully.");
     }
 
-    // Always ensure principal exists on every initialization check
+    // Always ensure principal exists
     const { rows: teacherRows } = await db.query("SELECT * FROM teachers WHERE login_id = $1", ['jahanzeb']);
     if (teacherRows.length === 0) {
       console.log("Seeding principal account...");
@@ -147,7 +161,7 @@ async function ensureDbInitialized() {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         ['admin_default', 'Muhammad Jahanzeb', 'principal@alnaseeha.edu', 'principal', 'jahanzeb', passHash, 'Principal', false]
       );
-      console.log("Principal account 'jahanzeb' created successfully.");
+      console.log("Principal account 'jahanzeb' created.");
     }
     isInitialized = true;
   } catch (err: any) {
