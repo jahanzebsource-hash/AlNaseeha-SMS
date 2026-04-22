@@ -147,8 +147,19 @@ async function ensureDbInitialized() {
       console.log("Applying/Updating database schema...");
       const schemaPath = path.join(process.cwd(), "schema.sql");
       const sql = fs.readFileSync(schemaPath, "utf8");
-      await db.query(sql);
-      console.log("Database schema applied successfully.");
+      
+      // Split by semicolon and run each statement, ignoring "already exists" errors
+      const statements = sql.split(';').filter(s => s.trim() !== '');
+      for (let statement of statements) {
+        try {
+          await db.query(statement);
+        } catch (sErr: any) {
+          if (!sErr.message.includes('already exists')) {
+             console.error("Schema statement failed:", sErr.message);
+          }
+        }
+      }
+      console.log("Database schema process completed.");
     }
 
     // Always ensure principal exists
