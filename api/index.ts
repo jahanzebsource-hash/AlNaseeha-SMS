@@ -39,18 +39,17 @@ function getPool() {
     connectionString = connectionString.replace(/['"]/g, '').trim();
 
     try {
-      // Robust parsing: If URL constructor fails, try to manually extract components
-      // This is helpful when passwords contain special characters that aren't encoded
-      let config: any = {
+      pool = new Pool({
         connectionString,
-        ssl: { rejectUnauthorized: false }
-      };
-
-      pool = new Pool(config);
+        ssl: {
+          rejectUnauthorized: false
+        },
+        connectionTimeoutMillis: 10000, // 10 seconds timeout
+        max: 20 // Standard limit
+      });
       
-      // Test connection immediately
       pool.on('error', (err) => {
-        console.error('Unexpected error on idle client', err);
+        console.error('Unexpected error on idle client', err.message);
         pool = null;
       });
       
