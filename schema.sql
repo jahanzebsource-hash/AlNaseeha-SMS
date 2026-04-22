@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS teachers (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE,
     contact_number VARCHAR(50),
+    employee_id VARCHAR(50),
     designation VARCHAR(100),
     base_salary NUMERIC(10, 2),
     subject VARCHAR(100),

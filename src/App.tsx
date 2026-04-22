@@ -1058,11 +1058,12 @@ function TeachersView({
           loginId: '', password: '', role: 'teacher', isTeaching: true 
         });
       } else {
-        alert("Failed to save staff. Check if Login ID is unique.");
+        const errData = await response.json().catch(() => ({}));
+        alert(`Failed to save staff: ${errData.error || "Please check if details (Login ID, Employee ID) are unique."}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Error saving staff member.");
+      alert(`Error saving staff member: ${err.message}`);
     }
   };
 
@@ -1101,9 +1102,13 @@ function TeachersView({
           baseSalary: '', qualification: '', assignedClass: '', 
           loginId: '', password: '', role: 'teacher', isTeaching: true 
         });
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        alert(`Failed to update staff: ${errData.error || "Please check if details are unique."}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert(`Error updating staff member: ${err.message}`);
     }
   };
 

@@ -159,7 +159,8 @@ async function ensureDbInitialized() {
         "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'teacher'",
         "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_teaching BOOLEAN DEFAULT TRUE",
         "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS designation VARCHAR(100)",
-        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS contact_number VARCHAR(50)"
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS contact_number VARCHAR(50)",
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS employee_id VARCHAR(50)"
       ];
       for (let sql of teacherMigrations) {
         try {
@@ -316,7 +317,7 @@ app.post("/api/teachers", async (req, res) => {
   const { 
     id, name, email, contactNumber, designation, baseSalary, 
     subject, qualification, loginId, password, role, 
-    assignedClass, isTeaching 
+    assignedClass, isTeaching, employeeId 
   } = req.body;
   
   try {
@@ -330,21 +331,21 @@ app.post("/api/teachers", async (req, res) => {
       const query = `
         UPDATE teachers SET 
         name=$2, email=$3, contact_number=$4, designation=$5, base_salary=$6, 
-        subject=$7, qualification=$8, login_id=$9, role=$10, assigned_class=$11, is_teaching=$12
-        ${passwordHash ? ', password_hash=$13' : ''}
+        subject=$7, qualification=$8, login_id=$9, role=$10, assigned_class=$11, is_teaching=$12, employee_id=$13
+        ${passwordHash ? ', password_hash=$14' : ''}
         WHERE id=$1
         RETURNING *
       `;
-      const params = [id, name, email, contactNumber, designation, baseSalary, subject, qualification, loginId, role, assignedClass, isTeaching];
+      const params = [id, name, email, contactNumber, designation, baseSalary, subject, qualification, loginId, role, assignedClass, isTeaching, employeeId];
       if (passwordHash) params.push(passwordHash);
       result = await db.query(query, params);
     } else {
       result = await db.query(
         `INSERT INTO teachers 
-         (id, name, email, contact_number, designation, base_salary, subject, qualification, login_id, password_hash, role, assigned_class, is_teaching) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) 
+         (id, name, email, contact_number, designation, base_salary, subject, qualification, login_id, password_hash, role, assigned_class, is_teaching, employee_id) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) 
          RETURNING *`,
-        [id || Math.random().toString(36).substr(2, 9), name, email, contactNumber, designation, baseSalary, subject, qualification, loginId, passwordHash, role, assignedClass, isTeaching]
+        [id || Math.random().toString(36).substr(2, 9), name, email, contactNumber, designation, baseSalary, subject, qualification, loginId, passwordHash, role, assignedClass, isTeaching, employeeId]
       );
     }
     const profile = toCamelCase(result.rows)[0];
