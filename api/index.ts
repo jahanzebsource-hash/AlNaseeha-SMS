@@ -160,7 +160,11 @@ async function ensureDbInitialized() {
         "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_teaching BOOLEAN DEFAULT TRUE",
         "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS designation VARCHAR(100)",
         "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS contact_number VARCHAR(50)",
-        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS employee_id VARCHAR(50)"
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS employee_id VARCHAR(50)",
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS assigned_class VARCHAR(50)",
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS base_salary NUMERIC(10, 2)",
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS subject VARCHAR(100)",
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS qualification TEXT"
       ];
       for (let sql of teacherMigrations) {
         try {
@@ -172,13 +176,39 @@ async function ensureDbInitialized() {
 
       console.log("Verifying student table columns...");
       const studentMigrations = [
-        "ALTER TABLE students ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE"
+        "ALTER TABLE students ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE students ADD COLUMN IF NOT EXISTS email VARCHAR(255)",
+        "ALTER TABLE students ADD COLUMN IF NOT EXISTS grade VARCHAR(50)",
+        "ALTER TABLE students ADD COLUMN IF NOT EXISTS section VARCHAR(50)",
+        "ALTER TABLE students ADD COLUMN IF NOT EXISTS monthly_fee NUMERIC(10, 2) DEFAULT 0",
+        "ALTER TABLE students ADD COLUMN IF NOT EXISTS arrears NUMERIC(10, 2) DEFAULT 0",
+        "ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_name VARCHAR(255)",
+        "ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_contact VARCHAR(50)",
+        "ALTER TABLE students ADD COLUMN IF NOT EXISTS address TEXT",
+        "ALTER TABLE students ADD COLUMN IF NOT EXISTS date_of_birth DATE"
       ];
       for (let sql of studentMigrations) {
         try {
           await db.query(sql);
         } catch (e: any) {
           if (!e.message.includes('already exists')) console.error("Student migration error:", e.message);
+        }
+      }
+
+      // Ensure other tables exist (simple surgical approach)
+      const tables = ['fee_records', 'transactions', 'attendance', 'payroll', 'inventory', 'school_settings'];
+      for (const table of tables) {
+        const { rows: tableRows } = await db.query(`SELECT to_regclass('${table}') as table_exists`);
+        if (!tableRows[0].table_exists) {
+          console.log(`Table ${table} missing. Running surgical creation...`);
+          // We can't easily extract just one table from schema.sql without a parser
+          // But we can run CREATE TABLE IF NOT EXISTS for all of them from schema.sql
+          const schemaPath = path.join(process.cwd(), "schema.sql");
+          const sql = fs.readFileSync(schemaPath, "utf8");
+          const statements = sql.split(';').filter(s => s.trim().toLowerCase().includes(`create table if not exists ${table}`));
+          for (let s of statements) {
+            try { await db.query(s); } catch (e) {}
+          }
         }
       }
     }
