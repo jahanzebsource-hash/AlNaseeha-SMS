@@ -118,6 +118,8 @@ const SESSION_SEQUENCE: Record<string, string> = {
 
 const SCHOOL_LOGO = "https://i.postimg.cc/hJNQDRvB/alnaseeha-logo.png"; // User provided link
 const SCHOOL_NAME = "Al-Naseeha High School";
+const SCHOOL_ADDRESS = "Main Mir nabi Bux town road, paretabad Hyderabad";
+const SCHOOL_PHONE = "0311-3281707";
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(authService.getCurrentUser());
@@ -288,6 +290,7 @@ export default function App() {
             students={students} 
             feeRecords={feeRecords} 
             feeChallans={feeChallans}
+            session={currentSession}
             onRecordFee={(record) => setFeeRecords(prev => [...prev, record])}
             onSaveChallans={(newChallans) => setFeeChallans(prev => [...prev, ...newChallans])}
             onDeleteChallan={(id) => setFeeChallans(prev => prev.filter(c => c.id !== id))}
@@ -572,7 +575,7 @@ export default function App() {
 
             <div className="text-right hidden sm:block">
               <div className="text-sm font-semibold text-foreground">{user?.name}</div>
-              <div className="text-[11px] text-muted-foreground uppercase">{user?.role} | Session: 2023-24</div>
+              <div className="text-[11px] text-muted-foreground uppercase">{user?.role} | Session: {currentSession}</div>
             </div>
             
             <Popover>
@@ -1840,6 +1843,7 @@ function FeesView({
   students, 
   feeRecords, 
   feeChallans, 
+  session,
   onRecordFee,
   onSaveChallans,
   onDeleteChallan,
@@ -1848,6 +1852,7 @@ function FeesView({
   students: Student[], 
   feeRecords: FeeRecord[], 
   feeChallans: FeeChallan[],
+  session: string,
   onRecordFee: (r: FeeRecord) => void,
   onSaveChallans: (c: FeeChallan[]) => void,
   onDeleteChallan: (id: string) => void,
@@ -2025,11 +2030,11 @@ function FeesView({
           <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
             <img src="${SCHOOL_LOGO}" style="width: 50px; height: 50px;" referrerpolicy="no-referrer" onerror="this.src='https://cdn-icons-png.flaticon.com/512/2913/2913008.png'">
             <div style="text-align: left;">
-              <h2 style="margin: 0; font-size: 14px; text-transform: uppercase; font-weight: 900;">Al-Naseeha High School</h2>
-              <p style="margin: 0; font-size: 9px; font-weight: bold; color: #666;">Chiniot, Punjab, Pakistan</p>
+              <h2 style="margin: 0; font-size: 14px; text-transform: uppercase; font-weight: 900;">${SCHOOL_NAME}</h2>
+              <p style="margin: 0; font-size: 9px; font-weight: bold; color: #666;">${SCHOOL_ADDRESS}</p>
             </div>
           </div>
-          <p style="margin: 2px 0; font-size: 9px; font-weight: bold; color: #666;">Contact: 0300-1234567 | Session: 2023-24</p>
+          <p style="margin: 2px 0; font-size: 9px; font-weight: bold; color: #666;">Contact: ${SCHOOL_PHONE} | Session: ${session}</p>
           <div style="background: #000; color: #fff; display: inline-block; padding: 2px 10px; font-size: 10px; margin-top: 5px; font-weight: bold; border-radius: 2px;">
             ${title}
           </div>
