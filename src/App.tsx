@@ -238,8 +238,16 @@ export default function App() {
       : students;
 
     switch (activeView) {
-      case 'dashboard':
-        return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} setActiveView={setActiveView} user={user} />;
+    case 'dashboard':
+        return (
+          <DashboardView 
+            totalMonthlyFee={totalMonthlyFee} 
+            recentStudents={students.slice(-4).reverse()} 
+            totalTeachers={teachers.length}
+            setActiveView={setActiveView} 
+            user={user} 
+          />
+        );
       case 'students':
         return <StudentsView students={displayStudents} onAddStudent={(s) => setStudents(prev => prev.some(item => item.id === s.id) ? prev.map(item => item.id === s.id ? s : item) : [...prev, s])} onDeleteStudent={onDeleteStudent} />;
       case 'teachers':
@@ -408,7 +416,15 @@ export default function App() {
       case 'announcements':
         return <AnnouncementsView />;
       default:
-        return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} setActiveView={setActiveView} user={user} />;
+        return (
+          <DashboardView 
+            totalMonthlyFee={totalMonthlyFee} 
+            recentStudents={students.slice(-4).reverse()} 
+            totalTeachers={teachers.length}
+            setActiveView={setActiveView} 
+            user={user} 
+          />
+        );
     }
   };
 
@@ -457,7 +473,7 @@ export default function App() {
           </Button>
         </div>
 
-        <ScrollArea className="flex-1 mt-4 no-scrollbar">
+        <div className="flex-1 overflow-y-auto no-scrollbar py-4">
           <nav className="space-y-4 px-3 pb-4">
             {categories.map((category) => {
               const categoryItems = filteredNavItems.filter(item => item.category === category);
@@ -496,7 +512,7 @@ export default function App() {
               );
             })}
           </nav>
-        </ScrollArea>
+        </div>
 
         <div className="p-4 border-t border-sidebar-border">
           <button 
@@ -613,10 +629,10 @@ export default function App() {
   );
 }
 
-function DashboardView({ totalMonthlyFee, recentStudents, setActiveView, user }: { totalMonthlyFee: number, recentStudents: Student[], setActiveView: (v: View) => void, user: UserProfile | null }) {
+function DashboardView({ totalMonthlyFee, recentStudents, totalTeachers, setActiveView, user }: { totalMonthlyFee: number, recentStudents: Student[], totalTeachers: number, setActiveView: (v: View) => void, user: UserProfile | null }) {
   const stats = [
     { label: 'Total Students', value: recentStudents.length.toString(), delta: '+24 this month', icon: Users, color: 'text-blue-600' },
-    { label: 'Active Teachers', value: '86', delta: '98% Attendance', icon: UserSquare2, color: 'text-emerald-600' },
+    { label: 'Active Teachers', value: totalTeachers.toString(), delta: `${Math.round((totalTeachers / 86) * 100) || 100}% Staff Strength`, icon: UserSquare2, color: 'text-emerald-600' },
     { label: 'Monthly Income', value: `Rs. ${totalMonthlyFee.toLocaleString()}`, delta: 'Total Fee Demand', icon: CreditCard, color: 'text-amber-600', private: true },
     { label: 'Daily Attendance', value: '94.2%', delta: 'Trending upwards', icon: CalendarCheck, color: 'text-purple-600' },
   ];
