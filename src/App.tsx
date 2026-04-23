@@ -44,7 +44,8 @@ import {
   BarChart3,
   ArrowUpCircle,
   ArrowDownCircle,
-  Wallet
+  Wallet,
+  PlusCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -199,20 +200,22 @@ export default function App() {
   }, [students]);
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'principal', 'teacher', 'accountant'] },
-    { id: 'students', label: 'Student Management', icon: Users, roles: ['admin', 'principal', 'accountant'] },
-    { id: 'teachers', label: 'Staff & Teachers', icon: UserSquare2, roles: ['admin', 'principal', 'accountant'] },
-    { id: 'attendance', label: 'Attendance System', icon: CalendarCheck, roles: ['admin', 'principal', 'teacher', 'accountant'] },
-    { id: 'fees', label: 'Fee & Financials', icon: CreditCard, roles: ['admin', 'principal', 'accountant'] },
-    { id: 'finance', label: 'Income & Expense', icon: Receipt, roles: ['admin', 'principal', 'accountant'] },
-    { id: 'cashbook', label: 'Daily Cashbook', icon: Calculator, roles: ['admin', 'principal', 'accountant'] },
-    { id: 'inventory', label: 'Inventory & Sale', icon: Package, roles: ['admin', 'principal', 'accountant'] },
-    { id: 'timetable', label: 'Time Table', icon: BookOpen, roles: ['admin', 'principal', 'teacher', 'student'] },
-    { id: 'session', label: 'Session & Promo', icon: RefreshCw, roles: ['admin', 'principal'] },
-    { id: 'balancesheet', label: 'Balance Sheet', icon: BarChart3, roles: ['admin', 'principal', 'accountant'] },
-    { id: 'exams', label: 'Examinations', icon: GraduationCap, roles: ['admin', 'principal', 'teacher', 'accountant'] },
-    { id: 'announcements', label: 'Announcements', icon: Bell, roles: ['all'] },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'principal', 'teacher', 'accountant'], category: 'Main' },
+    { id: 'students', label: 'Student Management', icon: Users, roles: ['admin', 'principal', 'accountant'], category: 'Academics' },
+    { id: 'teachers', label: 'Staff & Teachers', icon: UserSquare2, roles: ['admin', 'principal', 'accountant'], category: 'Academics' },
+    { id: 'attendance', label: 'Attendance System', icon: CalendarCheck, roles: ['admin', 'principal', 'teacher', 'accountant'], category: 'Academics' },
+    { id: 'timetable', label: 'Time Table', icon: BookOpen, roles: ['admin', 'principal', 'teacher', 'student'], category: 'Academics' },
+    { id: 'session', label: 'Session & Promo', icon: RefreshCw, roles: ['admin', 'principal'], category: 'Academics' },
+    { id: 'exams', label: 'Examinations', icon: GraduationCap, roles: ['admin', 'principal', 'teacher', 'accountant'], category: 'Academics' },
+    { id: 'fees', label: 'Fee & Financials', icon: CreditCard, roles: ['admin', 'principal', 'accountant'], category: 'Finance' },
+    { id: 'finance', label: 'Income & Expense', icon: Receipt, roles: ['admin', 'principal', 'accountant'], category: 'Finance' },
+    { id: 'cashbook', label: 'Daily Cashbook', icon: Calculator, roles: ['admin', 'principal', 'accountant'], category: 'Finance' },
+    { id: 'balancesheet', label: 'Balance Sheet', icon: BarChart3, roles: ['admin', 'principal', 'accountant'], category: 'Finance' },
+    { id: 'inventory', label: 'Inventory & Sale', icon: Package, roles: ['admin', 'principal', 'accountant'], category: 'Resources' },
+    { id: 'announcements', label: 'Announcements', icon: Bell, roles: ['all'], category: 'Resources' },
   ];
+
+  const categories = ['Main', 'Academics', 'Finance', 'Resources'];
 
   const filteredNavItems = navItems.filter(item => 
     !user || item.roles.includes('all') || item.roles.includes(user.role)
@@ -454,30 +457,46 @@ export default function App() {
           </Button>
         </div>
 
-        <nav className="flex-1 space-y-0 mt-4">
-          {filteredNavItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveView(item.id as View)}
-              className={`w-full flex items-center px-6 py-3 transition-all border-l-4 ${
-                activeView === item.id 
-                  ? 'bg-sidebar-accent text-white border-accent' 
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-white border-transparent'
-              }`}
-            >
-              <item.icon size={18} className="shrink-0" />
-              {isSidebarOpen && (
-                <motion.span 
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="ml-3 text-sm font-medium"
-                >
-                  {item.label}
-                </motion.span>
-              )}
-            </button>
-          ))}
-        </nav>
+        <ScrollArea className="flex-1 mt-4 no-scrollbar">
+          <nav className="space-y-4 px-3 pb-4">
+            {categories.map((category) => {
+              const categoryItems = filteredNavItems.filter(item => item.category === category);
+              if (categoryItems.length === 0) return null;
+              
+              return (
+                <div key={category} className="space-y-1">
+                  {isSidebarOpen && (
+                    <div className="px-3 mb-2">
+                       <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{category}</h2>
+                    </div>
+                  )}
+                  {categoryItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveView(item.id as View)}
+                      className={`w-full flex items-center px-4 py-2 rounded-lg transition-all ${
+                        activeView === item.id 
+                          ? 'bg-accent text-white shadow-lg shadow-accent/20' 
+                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-white'
+                      }`}
+                    >
+                      <item.icon size={18} className="shrink-0" />
+                      {isSidebarOpen && (
+                        <motion.span 
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="ml-3 text-sm font-medium"
+                        >
+                          {item.label}
+                        </motion.span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </nav>
+        </ScrollArea>
 
         <div className="p-4 border-t border-sidebar-border">
           <button 
@@ -1822,6 +1841,7 @@ function FeesView({
   const [openLedger, setOpenLedger] = useState(false);
   const [openChallanDetail, setOpenChallanDetail] = useState(false);
   const [openChallanEdit, setOpenChallanEdit] = useState(false);
+  const [openManualChallan, setOpenManualChallan] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'challans'>('all');
   const [challanSearch, setChallanSearch] = useState('');
   
@@ -1829,6 +1849,18 @@ function FeesView({
     amount: '',
     month: new Date().toLocaleString('default', { month: 'long' }),
     year: new Date().getFullYear().toString(),
+  });
+
+  const [manualChallanForm, setManualChallanForm] = useState({
+    studentId: '',
+    month: new Date().toLocaleString('default', { month: 'long' }),
+    year: new Date().getFullYear(),
+    tuitionFee: 0,
+    transportFee: 0,
+    examFee: 0,
+    arrears: 0,
+    arrearsDescription: '',
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth(), 10).toISOString().split('T')[0]
   });
 
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -1885,6 +1917,37 @@ function FeesView({
     };
     onSaveChallans([newChallan]);
     alert(`Challan generated for ${student.name}`);
+  };
+
+  const handleManualChallanSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualChallanForm.studentId) {
+      alert("Please select a student.");
+      return;
+    }
+
+    const total = Number(manualChallanForm.tuitionFee) + 
+                  Number(manualChallanForm.transportFee) + 
+                  Number(manualChallanForm.examFee) + 
+                  Number(manualChallanForm.arrears);
+
+    const newChallan: FeeChallan = {
+      id: `CH-IND-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+      studentId: manualChallanForm.studentId,
+      month: manualChallanForm.month,
+      year: manualChallanForm.year,
+      issueDate: new Date().toISOString().split('T')[0],
+      dueDate: manualChallanForm.dueDate,
+      monthlyFee: Number(manualChallanForm.tuitionFee),
+      arrears: Number(manualChallanForm.arrears) + Number(manualChallanForm.transportFee) + Number(manualChallanForm.examFee),
+      arrearsDescription: `${manualChallanForm.arrearsDescription ? manualChallanForm.arrearsDescription + ' ' : ''}(Exam: ${manualChallanForm.examFee}, Transport: ${manualChallanForm.transportFee})`,
+      totalPayable: total,
+      status: 'issued'
+    };
+
+    onSaveChallans([newChallan]);
+    setOpenManualChallan(false);
+    alert("Individual challan generated successfully.");
   };
 
   const handleRecordFee = (e: React.FormEvent) => {
@@ -2130,6 +2193,13 @@ function FeesView({
               Defaulters Total
             </Button>
             <Button 
+              onClick={() => setOpenManualChallan(true)} 
+              variant="outline"
+              className="border-accent text-accent hover:bg-accent/10 h-9 text-xs"
+            >
+              <PlusCircle size={16} className="mr-2" /> Generate Individual Challan
+            </Button>
+            <Button 
               onClick={generateBulkChallansAction} 
               className="bg-accent hover:bg-accent/90 text-white h-9 text-xs"
             >
@@ -2305,6 +2375,84 @@ function FeesView({
           </CardContent>
         </Card>
       )}
+
+      {/* Manual Individual Challan Dialog */}
+      <Dialog open={openManualChallan} onOpenChange={setOpenManualChallan}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Generate Individual Challan</DialogTitle>
+            <DialogDescription>Create a custom fee challan for a specific student</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleManualChallanSubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Select Student</Label>
+              <Select 
+                value={manualChallanForm.studentId} 
+                onValueChange={(v) => {
+                  const student = students.find(s => s.id === v);
+                  setManualChallanForm({
+                    ...manualChallanForm, 
+                    studentId: v,
+                    tuitionFee: student?.monthlyFee || 0,
+                    arrears: student?.arrears || 0,
+                    arrearsDescription: student?.arrearsDescription || ''
+                  });
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select a student" /></SelectTrigger>
+                <SelectContent>
+                  {students.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name} ({s.rollNumber})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs">Month</Label>
+                <Select value={manualChallanForm.month} onValueChange={(v) => setManualChallanForm({...manualChallanForm, month: v})}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Year</Label>
+                <Input type="number" value={manualChallanForm.year} onChange={(e) => setManualChallanForm({...manualChallanForm, year: Number(e.target.value)})} className="h-9 text-xs" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs">Tuition Fee</Label>
+                <Input type="number" value={manualChallanForm.tuitionFee} onChange={(e) => setManualChallanForm({...manualChallanForm, tuitionFee: Number(e.target.value)})} className="h-9 text-xs" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Transport Fee</Label>
+                <Input type="number" value={manualChallanForm.transportFee} onChange={(e) => setManualChallanForm({...manualChallanForm, transportFee: Number(e.target.value)})} className="h-9 text-xs" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs">Exam Fee</Label>
+                <Input type="number" value={manualChallanForm.examFee} onChange={(e) => setManualChallanForm({...manualChallanForm, examFee: Number(e.target.value)})} className="h-9 text-xs" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Arrears</Label>
+                <Input type="number" value={manualChallanForm.arrears} onChange={(e) => setManualChallanForm({...manualChallanForm, arrears: Number(e.target.value)})} className="h-9 text-xs" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Due Date</Label>
+              <Input type="date" value={manualChallanForm.dueDate} onChange={(e) => setManualChallanForm({...manualChallanForm, dueDate: e.target.value})} className="h-9 text-xs" />
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setOpenManualChallan(false)} className="h-9 text-xs">Cancel</Button>
+              <Button type="submit" className="bg-accent h-9 text-xs font-bold">Generate & Save Challan</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Challan Detail Dialog */}
       <Dialog open={openChallanDetail} onOpenChange={setOpenChallanDetail}>
