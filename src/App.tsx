@@ -239,7 +239,7 @@ export default function App() {
 
     switch (activeView) {
       case 'dashboard':
-        return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} setActiveView={setActiveView} />;
+        return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} setActiveView={setActiveView} user={user} />;
       case 'students':
         return <StudentsView students={displayStudents} onAddStudent={(s) => setStudents(prev => prev.some(item => item.id === s.id) ? prev.map(item => item.id === s.id ? s : item) : [...prev, s])} onDeleteStudent={onDeleteStudent} />;
       case 'teachers':
@@ -408,7 +408,7 @@ export default function App() {
       case 'announcements':
         return <AnnouncementsView />;
       default:
-        return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} setActiveView={setActiveView} />;
+        return <DashboardView totalMonthlyFee={totalMonthlyFee} recentStudents={students.slice(-4).reverse()} setActiveView={setActiveView} user={user} />;
     }
   };
 
@@ -613,18 +613,20 @@ export default function App() {
   );
 }
 
-function DashboardView({ totalMonthlyFee, recentStudents, setActiveView }: { totalMonthlyFee: number, recentStudents: Student[], setActiveView: (v: View) => void }) {
+function DashboardView({ totalMonthlyFee, recentStudents, setActiveView, user }: { totalMonthlyFee: number, recentStudents: Student[], setActiveView: (v: View) => void, user: UserProfile | null }) {
   const stats = [
     { label: 'Total Students', value: recentStudents.length.toString(), delta: '+24 this month', icon: Users, color: 'text-blue-600' },
     { label: 'Active Teachers', value: '86', delta: '98% Attendance', icon: UserSquare2, color: 'text-emerald-600' },
-    { label: 'Monthly Income', value: `Rs. ${totalMonthlyFee.toLocaleString()}`, delta: 'Total Fee Demand', icon: CreditCard, color: 'text-amber-600' },
+    { label: 'Monthly Income', value: `Rs. ${totalMonthlyFee.toLocaleString()}`, delta: 'Total Fee Demand', icon: CreditCard, color: 'text-amber-600', private: true },
     { label: 'Daily Attendance', value: '94.2%', delta: 'Trending upwards', icon: CalendarCheck, color: 'text-purple-600' },
   ];
 
+  const filteredStats = user?.role === 'teacher' ? stats.filter(s => !s.private) : stats;
+
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-        {stats.map((stat, i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 text-sidebar-foreground">
+        {filteredStats.map((stat, i) => (
           <Card key={i} className="border border-border shadow-none rounded-xl">
             <CardContent className="p-5">
               <p className="text-[11px] text-muted-foreground font-bold uppercase tracking-wider mb-2">{stat.label}</p>
