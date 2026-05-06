@@ -197,6 +197,7 @@ export default function App() {
   };
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [dbStatus, setDbStatus] = useState<{ connected: boolean, error: string | null }>({ connected: true, error: null });
   const [students, setStudents] = useState<Student[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [payroll, setPayroll] = useState<PayrollRecord[]>([]);
@@ -220,19 +221,27 @@ export default function App() {
   const [openingBalance, setOpeningBalance] = useState<number>(0);
   const [currentSession, setCurrentSession] = useState<string>('2023-24');
 
-  // Load Settings from DB
+  // Load Settings and Check DB Health
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchSettingsAndHealth = async () => {
       try {
+        const healthRes = await fetch('/api/health');
+        const healthData = await healthRes.json();
+        setDbStatus({ 
+          connected: healthData.database === true, 
+          error: healthData.error || (healthData.databaseConfigured ? null : "DATABASE_URL not configured")
+        });
+
         const response = await fetch('/api/settings');
         const data = await response.json();
         if (data.openingBalance) setOpeningBalance(Number(data.openingBalance));
         if (data.currentSession) setCurrentSession(data.currentSession);
       } catch (err) {
-        console.error("Failed to load settings:", err);
+        console.error("Failed to load settings or check health:", err);
+        setDbStatus({ connected: false, error: "Server unreachable" });
       }
     };
-    fetchSettings();
+    fetchSettingsAndHealth();
   }, []);
 
   const saveSetting = async (key: string, value: any) => {
@@ -247,7 +256,7 @@ export default function App() {
     }
   };
 
-  // Smart Sync Initialization
+  // Load Initial Data once
   useEffect(() => {
     const loadInitialData = async () => {
       try {
@@ -269,13 +278,13 @@ export default function App() {
           smartDB.getAllRecords('payroll')
         ]);
 
-        if (storedStudents.length > 0) setStudents(storedStudents);
-        if (storedTeachers.length > 0) setTeachers(storedTeachers);
-        if (storedTransactions.length > 0) setTransactions(storedTransactions);
-        if (storedAttendance.length > 0) setAttendance(storedAttendance);
-        if (storedFees.length > 0) setFeeRecords(storedFees);
-        if (storedInventory.length > 0) setInventory(storedInventory);
-        if (storedPayroll.length > 0) setPayroll(storedPayroll);
+        if (storedStudents && storedStudents.length > 0) setStudents(storedStudents);
+        if (storedTeachers && storedTeachers.length > 0) setTeachers(storedTeachers);
+        if (storedTransactions && storedTransactions.length > 0) setTransactions(storedTransactions);
+        if (storedAttendance && storedAttendance.length > 0) setAttendance(storedAttendance);
+        if (storedFees && storedFees.length > 0) setFeeRecords(storedFees);
+        if (storedInventory && storedInventory.length > 0) setInventory(storedInventory);
+        if (storedPayroll && storedPayroll.length > 0) setPayroll(storedPayroll);
       } catch (err) {
         console.error("Critical: Failed to load initial data from server:", err);
       }
@@ -283,42 +292,13 @@ export default function App() {
     loadInitialData();
   }, []);
 
-  // Auto-sync effects to ensure persistence
-  useEffect(() => {
-    if (students.length > 0) {
-      students.forEach(s => smartDB.saveRecord('students', s));
-    }
-  }, [students]);
-
-  useEffect(() => {
-    if (teachers.length > 0) {
-      teachers.forEach(t => smartDB.saveRecord('teachers', t));
-    }
-  }, [teachers]);
-
-  useEffect(() => {
-    if (feeRecords.length > 0) {
-      feeRecords.forEach(f => smartDB.saveRecord('fees', f));
-    }
-  }, [feeRecords]);
-
-  useEffect(() => {
-    if (transactions.length > 0) {
-      transactions.forEach(t => smartDB.saveRecord('transactions', t));
-    }
-  }, [transactions]);
-
-  useEffect(() => {
-    if (inventory.length > 0) {
-      inventory.forEach(i => smartDB.saveRecord('inventory', i));
-    }
-  }, [inventory]);
-
-  useEffect(() => {
-    if (attendance.length > 0) {
-      attendance.forEach(a => smartDB.saveRecord('attendance', a));
-    }
-  }, [attendance]);
+  // Simplified sync functions to avoid bulk save issue
+  const syncStudent = (s: Student) => smartDB.saveRecord('students', s);
+  const syncTeacher = (t: Teacher) => smartDB.saveRecord('teachers', t);
+  const syncFee = (f: FeeRecord) => smartDB.saveRecord('fees', f);
+  const syncTransaction = (t: FinanceTransaction) => smartDB.saveRecord('transactions', t);
+  const syncInventory = (i: InventoryItem) => smartDB.saveRecord('inventory', i);
+  const syncAttendance = (a: Attendance) => smartDB.saveRecord('attendance', a);
 
   const totalMonthlyFee = useMemo(() => {
     return students.reduce((sum, student) => sum + (Number(student.monthlyFee) || 0), 0);
@@ -374,14 +354,40 @@ export default function App() {
           />
         );
       case 'students':
-        return <StudentsView students={displayStudents} onAddStudent={(s) => setStudents(prev => prev.some(item => item.id === s.id) ? prev.map(item => item.id === s.id ? s : item) : [...prev, s])} onDeleteStudent={onDeleteStudent} />;
+        return (
+          <StudentsView 
+            students={displayStudents} 
+            onAddStudent={(s) => {
+              setStudents(prev => {
+                const exists = prev.some(item => item.id === s.id);
+                const next = exists ? prev.map(item => item.id === s.id ? s : item) : [...prev, s];
+                syncStudent(s);
+                return next;
+              });
+            }} 
+            onDeleteStudent={onDeleteStudent} 
+          />
+        );
       case 'teachers':
         return (
           <TeachersView 
             teachers={teachers} 
             payroll={payroll}
-            onAddTeacher={(t) => setTeachers(prev => prev.some(item => item.id === t.id) ? prev.map(item => item.id === t.id ? t : item) : [...prev, t])}
-            onGeneratePayroll={(p) => setPayroll([...payroll, p])}
+            onAddTeacher={(t) => {
+              setTeachers(prev => {
+                const exists = prev.some(item => item.id === t.id);
+                const next = exists ? prev.map(item => item.id === t.id ? t : item) : [...prev, t];
+                syncTeacher(t);
+                return next;
+              });
+            }}
+            onGeneratePayroll={(p) => {
+              setPayroll(prev => {
+                const next = [...prev, p];
+                smartDB.saveRecord('payroll', p);
+                return next;
+              });
+            }}
           />
         );
       case 'attendance':
@@ -391,18 +397,23 @@ export default function App() {
             attendance={attendance}
             onMarkAttendance={(sId, status) => {
               const today = new Date().toISOString().split('T')[0];
+              const newAtt = {
+                id: Math.random().toString(36).substr(2, 9),
+                studentId: sId,
+                status,
+                date: today,
+                markedBy: user?.name || 'Admin'
+              };
+              
               setAttendance(prev => {
                 const existing = prev.find(a => a.studentId === sId && a.date === today);
                 if (existing) {
-                  return prev.map(a => a.id === existing.id ? { ...a, status } : a);
+                  const updated = { ...existing, status };
+                  syncAttendance(updated);
+                  return prev.map(a => a.id === existing.id ? updated : a);
                 }
-                return [...prev, {
-                  id: Math.random().toString(36).substr(2, 9),
-                  studentId: sId,
-                  status,
-                  date: today,
-                  markedBy: user?.name || 'Admin'
-                }];
+                syncAttendance(newAtt);
+                return [...prev, newAtt];
               });
             }}
           />
@@ -417,10 +428,19 @@ export default function App() {
             onRecordFee={(record, updatedStudent) => {
               setFeeRecords(prev => [...prev, record]);
               setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+              syncFee(record);
+              syncStudent(updatedStudent);
             }}
-            onSaveChallans={(newChallans) => setFeeChallans(prev => [...prev, ...newChallans])}
+            onSaveChallans={(newChallans) => {
+              setFeeChallans(prev => [...prev, ...newChallans]);
+              // Challans are often generated in bulk, so we should be careful here
+              newChallans.forEach(c => smartDB.saveRecord('challans', c)); // Assuming challans collection exists
+            }}
             onDeleteChallan={(id) => setFeeChallans(prev => prev.filter(c => c.id !== id))}
-            onUpdateChallan={(challan) => setFeeChallans(prev => prev.map(c => c.id === challan.id ? challan : c))}
+            onUpdateChallan={(challan) => {
+              setFeeChallans(prev => prev.map(c => c.id === challan.id ? challan : c));
+              smartDB.saveRecord('challans', challan);
+            }}
           />
         );
       case 'finance':
@@ -428,8 +448,14 @@ export default function App() {
           <FinanceView 
             students={students} 
             transactions={transactions}
-            onAddTransaction={(t) => setTransactions(prev => [...prev, t])}
-            onDeleteTransaction={(id) => setTransactions(prev => prev.filter(tr => tr.id !== id))}
+            onAddTransaction={(t) => {
+              setTransactions(prev => [...prev, t]);
+              syncTransaction(t);
+            }}
+            onDeleteTransaction={(id) => {
+              setTransactions(prev => prev.filter(tr => tr.id !== id));
+              smartDB.deleteRecord('transactions', id);
+            }}
           />
         );
       case 'cashbook':
@@ -704,10 +730,17 @@ export default function App() {
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4 border-r border-slate-200 pr-6 no-print">
                <div className="flex flex-col items-end">
-                 <Badge variant="secondary" className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-2 bg-emerald-50 text-emerald-600 border-emerald-100">
-                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                   System Connected
+                 <Badge 
+                   variant="secondary" 
+                   className={cn(
+                     "text-[9px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-2",
+                     dbStatus.connected ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"
+                   )}
+                 >
+                   <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", dbStatus.connected ? "bg-emerald-500" : "bg-rose-500")} />
+                   {dbStatus.connected ? 'Cloud Sync Active' : 'Offline Mode'}
                  </Badge>
+                 {dbStatus.error && <p className="text-[7px] font-bold text-rose-400 mt-0.5 uppercase tracking-tighter">{dbStatus.error}</p>}
                </div>
                <Popover>
                 <PopoverTrigger className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), "text-[10px] font-black text-slate-500 hover:text-accent uppercase tracking-[0.2em] gap-3 px-3 rounded-xl transition-all")}>
@@ -2327,37 +2360,55 @@ function FeesView({
   const displayList = activeTab === 'all' ? students : pendingStudents;
 
   return (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <Card className="border-none shadow-sm bg-slate-900 text-white rounded-xl overflow-hidden group hover:shadow-md transition-all">
-            <CardContent className="p-5">
-              <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest mb-3">Revenue Potential</p>
-              <h3 className="text-xl font-black tracking-tight leading-none mb-1">Rs. {students.reduce((sum, s) => sum + (Number(s.monthlyFee) || 0), 0).toLocaleString()}</h3>
-              <p className="text-[7px] font-bold text-emerald-400/60 uppercase tracking-widest">Expected Tuition Pool</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 no-print">
+        <Card className="border-none shadow-sm bg-slate-900 text-white rounded-xl overflow-hidden">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="p-2.5 bg-white/10 rounded-lg text-emerald-400">
+              <TrendingUp size={18} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Expected Pool</p>
+              <h3 className="text-lg font-black tracking-tight">Rs. {students.reduce((sum, s) => sum + (Number(s.monthlyFee) || 0), 0).toLocaleString()}</h3>
+            </div>
+          </CardContent>
+        </Card>
 
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card className="border-none shadow-sm bg-rose-50 text-rose-600 rounded-xl overflow-hidden group hover:shadow-md transition-all">
-            <CardContent className="p-5">
-              <p className="text-[8px] font-black text-rose-400 uppercase tracking-widest mb-3">Total Receivables</p>
-              <h3 className="text-xl font-black text-rose-600 tracking-tight leading-none mb-1">Rs. {totalPending.toLocaleString()}</h3>
-              <p className="text-[7px] font-bold text-rose-500/60 uppercase tracking-widest">{pendingStudents.length} Profiles Pending</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <Card className="border-none shadow-sm bg-rose-50 rounded-xl overflow-hidden">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="p-2.5 bg-white shadow-sm rounded-lg text-rose-500">
+              <TrendingDown size={18} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest leading-none mb-1">Receivables</p>
+              <h3 className="text-lg font-black text-rose-600 tracking-tight">Rs. {totalPending.toLocaleString()}</h3>
+            </div>
+          </CardContent>
+        </Card>
 
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Card className="border-none shadow-sm bg-white rounded-xl overflow-hidden group hover:shadow-md transition-all">
-            <CardContent className="p-5">
-              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-3">Challan Registry</p>
-              <h3 className="text-xl font-black text-slate-900 tracking-tight leading-none mb-1">{feeChallans.length}</h3>
-              <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">Issued Documents</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <Card className="border-none shadow-sm bg-emerald-50 rounded-xl overflow-hidden">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="p-2.5 bg-white shadow-sm rounded-lg text-emerald-500">
+              <Wallet size={18} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-emerald-500/60 uppercase tracking-widest leading-none mb-1">Total Collected</p>
+              <h3 className="text-lg font-black text-emerald-600 tracking-tight">Rs. {feeRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0).toLocaleString()}</h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm bg-white rounded-xl overflow-hidden">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="p-2.5 bg-slate-50 rounded-lg text-slate-400">
+              <FileText size={18} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Issued Challans</p>
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">{feeChallans.length}</h3>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl w-fit">
