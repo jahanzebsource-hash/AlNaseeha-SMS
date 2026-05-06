@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS students (
     roll_number VARCHAR(100) UNIQUE NOT NULL,
     grade VARCHAR(50),
     section VARCHAR(50),
+    gender VARCHAR(20),
     monthly_fee NUMERIC(10, 2) DEFAULT 0,
     arrears NUMERIC(10, 2) DEFAULT 0,
     parent_name VARCHAR(255),

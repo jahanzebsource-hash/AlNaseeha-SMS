@@ -18,6 +18,7 @@ export interface Student extends UserProfile {
   rollNumber: string;
   grade: string;
   section: string;
+  gender: string;
   currentClass?: string; // added to fix lint error
   parentName: string;
   parentContact: string;

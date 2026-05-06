@@ -25,6 +25,7 @@ import {
   MessageCircle,
   Trophy,
   Star,
+  Heart,
   FileText,
   TrendingDown,
   TrendingUp,
@@ -33,6 +34,8 @@ import {
   Eye,
   Trash2,
   Edit,
+  Edit2,
+  Edit3,
   ArrowUpRight,
   ArrowDownRight,
   BookOpen,
@@ -50,7 +53,6 @@ import {
   ExternalLink,
   PieChart,
   UserPlus2,
-  Edit3,
   Layout,
   Send,
   ShieldCheck,
@@ -907,17 +909,25 @@ function StudentsView({ students, onAddStudent, onDeleteStudent }: { students: S
   const [open, setOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [filterClass, setFilterClass] = useState('all');
+  const [filterGender, setFilterGender] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
       const matchesClass = filterClass === 'all' || s.grade === filterClass;
+      const matchesGender = filterGender === 'all' || s.gender === filterGender;
       const matchesSearch = (s.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (s.rollNumber || '').includes(searchQuery) ||
                           (s.parentName || '').toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesClass && matchesSearch;
+      return matchesClass && matchesGender && matchesSearch;
     });
-  }, [students, filterClass, searchQuery]);
+  }, [students, filterClass, filterGender, searchQuery]);
+
+  const genderStats = useMemo(() => {
+    const boys = filteredStudents.filter(s => s.gender === 'Male').length;
+    const girls = filteredStudents.filter(s => s.gender === 'Female').length;
+    return { boys, girls, total: filteredStudents.length };
+  }, [filteredStudents]);
 
   const uniqueClasses = SCHOOL_CLASSES;
 
@@ -930,6 +940,7 @@ function StudentsView({ students, onAddStudent, onDeleteStudent }: { students: S
     parentName: '',
     parentContact: '',
     dateOfBirth: '',
+    gender: 'Male',
     monthlyFee: '',
     grade: '',
     section: '',
@@ -943,7 +954,7 @@ function StudentsView({ students, onAddStudent, onDeleteStudent }: { students: S
     setOpen(isOpen);
     if (!isOpen) {
       setEditingStudent(null);
-      setFormData({ name: '', parentName: '', parentContact: '', dateOfBirth: '', monthlyFee: '', grade: '', section: '', rollNumber: '', arrears: '', arrearsDescription: '', isActive: true });
+      setFormData({ name: '', parentName: '', parentContact: '', dateOfBirth: '', gender: 'Male', monthlyFee: '', grade: '', section: '', rollNumber: '', arrears: '', arrearsDescription: '', isActive: true });
     }
   };
 
@@ -954,6 +965,7 @@ function StudentsView({ students, onAddStudent, onDeleteStudent }: { students: S
       parentName: student.parentName,
       parentContact: student.parentContact,
       dateOfBirth: student.dateOfBirth,
+      gender: student.gender || 'Male',
       monthlyFee: (Number(student.monthlyFee) || 0).toString(),
       grade: student.grade,
       section: student.section,
@@ -975,6 +987,7 @@ function StudentsView({ students, onAddStudent, onDeleteStudent }: { students: S
       parentName: formData.parentName,
       parentContact: formData.parentContact,
       dateOfBirth: formData.dateOfBirth,
+      gender: formData.gender,
       monthlyFee: Number(formData.monthlyFee),
       grade: formData.grade,
       section: formData.section,
@@ -995,88 +1008,107 @@ function StudentsView({ students, onAddStudent, onDeleteStudent }: { students: S
   };
 
   return (
-    <div className="space-y-10 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-slate-200/60 no-print">
+    <div className="space-y-6 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-200/60 no-print">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Student Directory</h2>
-          <p className="text-slate-500 font-bold mt-2 uppercase tracking-[0.2em] text-[10px]">Academic Records • Archive Phase IV</p>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Student Directory</h2>
+          <p className="text-slate-500 font-bold mt-1 uppercase tracking-[0.2em] text-[9px]">Academic Records & Archives</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Button 
             variant="outline" 
             onClick={handlePrint} 
-            className="h-14 px-8 rounded-2xl text-[11px] font-black uppercase tracking-widest border-slate-200 hover:bg-slate-50 text-slate-600 transition-all shadow-sm active:scale-95"
+            className="h-11 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest border-slate-200 hover:bg-slate-50 text-slate-600 transition-all shadow-sm active:scale-95"
           >
-            <Printer size={18} className="mr-3 opacity-60" /> Export List
+            <Printer size={16} className="mr-2 opacity-60" /> Export
           </Button>
           <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-              <Button className="bg-accent hover:bg-accent/90 text-white h-14 px-10 rounded-[1.2rem] font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl shadow-accent/25 transition-all hover:scale-105 active:scale-95">
-                <PlusCircle size={20} className="mr-3" /> New Enrollment
+              <Button className="bg-accent hover:bg-accent/90 text-white h-11 px-8 rounded-xl font-black uppercase tracking-[0.2em] text-[10px] shadow-lg shadow-accent/20 transition-all hover:scale-105 active:scale-95">
+                <PlusCircle size={18} className="mr-2" /> Enrollment
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[550px] rounded-[3rem] p-0 overflow-hidden border-none shadow-[0_32px_64px_-16px_rgba(0,0,0,0.2)]">
-              <div className="bg-slate-950 p-10 text-white relative overflow-hidden">
+            <DialogContent className="sm:max-w-[500px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
+              <div className="bg-slate-950 p-8 text-white relative overflow-hidden">
                 <div className="relative z-10">
-                  <DialogTitle className="text-3xl font-black tracking-tight mb-2">{editingStudent ? 'Update Profile' : 'Student Enrollment'}</DialogTitle>
-                  <DialogDescription className="font-bold text-slate-500 uppercase tracking-widest text-[10px]">Portal Entry Verification Required</DialogDescription>
+                  <DialogTitle className="text-xl font-black tracking-tight mb-1">{editingStudent ? 'Update Profile' : 'Student Enrollment'}</DialogTitle>
+                  <DialogDescription className="font-bold text-slate-500 uppercase tracking-widest text-[8px]">New Admission Entry</DialogDescription>
                 </div>
-                <div className="absolute top-0 right-0 w-48 h-48 bg-accent/20 rounded-full blur-[80px] -mr-24 -mt-24" />
+                <div className="absolute top-0 right-0 w-32 h-32 bg-accent/20 rounded-full blur-3xl -mr-16 -mt-16" />
               </div>
-              <form onSubmit={handleSubmit} className="p-10 bg-white space-y-8">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Student Full Name</Label>
-                    <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold" required />
+              <form onSubmit={handleSubmit} className="p-8 bg-white space-y-6 max-h-[70vh] overflow-y-auto">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Student Name</Label>
+                    <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="h-11 rounded-xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold text-sm" required />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Father Name</Label>
-                    <Input value={formData.parentName} onChange={(e) => setFormData({...formData, parentName: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold" required />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Primary Contact</Label>
-                    <Input value={formData.parentContact} onChange={(e) => setFormData({...formData, parentContact: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Monthly Tuition</Label>
-                    <Input type="number" value={formData.monthlyFee} onChange={(e) => setFormData({...formData, monthlyFee: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold" required />
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Father Name</Label>
+                    <Input value={formData.parentName} onChange={(e) => setFormData({...formData, parentName: e.target.value})} className="h-11 rounded-xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold text-sm" required />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Academic Grade</Label>
-                    <Select value={formData.grade} onValueChange={(val) => setFormData({...formData, grade: val})}>
-                      <SelectTrigger className="h-14 rounded-2xl bg-slate-50 border-transparent transition-all font-bold">
-                        <SelectValue placeholder="Select" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Contact No</Label>
+                    <Input value={formData.parentContact} onChange={(e) => setFormData({...formData, parentContact: e.target.value})} className="h-11 rounded-xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold text-sm" required />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Date of Birth</Label>
+                    <Input type="date" value={formData.dateOfBirth} onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})} className="h-11 rounded-xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold text-sm" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Gender</Label>
+                    <Select value={formData.gender} onValueChange={(val) => setFormData({...formData, gender: val})}>
+                      <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-transparent transition-all font-bold text-sm">
+                        <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-2xl">
-                        {uniqueClasses.map(c => <SelectItem key={c} value={c} className="rounded-xl">{c}</SelectItem>)}
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Section</Label>
-                    <Input value={formData.section} onChange={(e) => setFormData({...formData, section: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-transparent transition-all font-bold" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Roll ID</Label>
-                    <Input value={formData.rollNumber} onChange={(e) => setFormData({...formData, rollNumber: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-transparent transition-all font-bold" />
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Monthly Fee</Label>
+                    <Input type="number" value={formData.monthlyFee} onChange={(e) => setFormData({...formData, monthlyFee: e.target.value})} className="h-11 rounded-xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold text-sm" required />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Previous Arrears (Baqaya)</Label>
-                    <Input type="number" value={formData.arrears} onChange={(e) => setFormData({...formData, arrears: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold" placeholder="0" />
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Grade</Label>
+                    <Select value={formData.grade} onValueChange={(val) => setFormData({...formData, grade: val})}>
+                      <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-transparent transition-all font-bold text-sm">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {uniqueClasses.map(c => <SelectItem key={c} value={c} className="rounded-lg">{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Arrears Description</Label>
-                    <Input value={formData.arrearsDescription} onChange={(e) => setFormData({...formData, arrearsDescription: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold" placeholder="e.g. Last year dues" />
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Section</Label>
+                    <Input value={formData.section} onChange={(e) => setFormData({...formData, section: e.target.value})} className="h-11 rounded-xl bg-slate-50 border-transparent transition-all font-bold text-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Roll No</Label>
+                    <Input value={formData.rollNumber} onChange={(e) => setFormData({...formData, rollNumber: e.target.value})} className="h-11 rounded-xl bg-slate-50 border-transparent transition-all font-bold text-sm" />
                   </div>
                 </div>
-                <Button type="submit" className="w-full h-16 bg-accent font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-accent/20 text-xs">
-                  {editingStudent ? 'Synchronize Record' : 'Activate Admission'}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Baqaya Amount</Label>
+                    <Input type="number" value={formData.arrears} onChange={(e) => setFormData({...formData, arrears: e.target.value})} className="h-11 rounded-xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold text-sm" placeholder="0" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Description</Label>
+                    <Input value={formData.arrearsDescription} onChange={(e) => setFormData({...formData, arrearsDescription: e.target.value})} className="h-11 rounded-xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold text-sm" placeholder="e.g. Prev balance" />
+                  </div>
+                </div>
+                <Button type="submit" className="w-full h-12 bg-accent font-black uppercase tracking-widest rounded-xl shadow-lg shadow-accent/20 text-[11px]">
+                  {editingStudent ? 'Sync Record' : 'Activate Admission'}
                 </Button>
               </form>
             </DialogContent>
@@ -1084,101 +1116,137 @@ function StudentsView({ students, onAddStudent, onDeleteStudent }: { students: S
         </div>
       </div>
 
-      <div className="no-print grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-8 relative group">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-accent transition-colors" size={20} />
+      <div className="no-print grid grid-cols-1 md:grid-cols-12 gap-4">
+        <div className="md:col-span-12 flex flex-wrap items-center gap-2 mb-2">
+          <div className="bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+            <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Students</span>
+            <span className="text-xs font-black text-blue-600">{genderStats.total}</span>
+          </div>
+          <div className="bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+            <Users size={12} className="text-indigo-400" />
+            <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Boys</span>
+            <span className="text-xs font-black text-indigo-600">{genderStats.boys}</span>
+          </div>
+          <div className="bg-rose-50 border border-rose-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+            <Heart size={12} className="text-rose-400" />
+            <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest">Girls</span>
+            <span className="text-xs font-black text-rose-600">{genderStats.girls}</span>
+          </div>
+        </div>
+        
+        <div className="md:col-span-6 relative group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-accent transition-colors" size={16} />
           <Input 
-            placeholder="Search students by name, roll number, or parentage..." 
+            placeholder="Search students..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-14 h-16 rounded-[1.5rem] border-none shadow-sm shadow-slate-200/50 bg-white text-base font-medium focus:ring-accent/10 placeholder:text-slate-400"
+            className="pl-11 h-11 rounded-xl border-none shadow-sm bg-white text-xs font-medium focus:ring-accent/10 placeholder:text-slate-400"
           />
         </div>
-        <div className="md:col-span-4">
+        <div className="md:col-span-3">
           <Select value={filterClass} onValueChange={setFilterClass}>
-            <SelectTrigger className="h-16 rounded-[1.5rem] border-none shadow-sm shadow-slate-200/50 bg-white font-black text-slate-600 px-6">
-              <div className="flex items-center gap-3">
-                <Filter size={18} className="opacity-50" />
-                <span className="uppercase tracking-widest text-[11px] mb-0.5">Filter Class</span>
+            <SelectTrigger className="h-11 rounded-xl border-none shadow-sm bg-white font-bold text-slate-600 px-4 text-[10px] uppercase tracking-widest">
+              <div className="flex items-center gap-2">
+                <Filter size={14} className="text-slate-300" />
+                <span>{filterClass === 'all' ? 'All Classes' : filterClass}</span>
               </div>
-              <SelectValue />
             </SelectTrigger>
-            <SelectContent className="rounded-2xl border-none shadow-2xl">
-              <SelectItem value="all" className="rounded-xl font-bold">All Divisions</SelectItem>
-              {uniqueClasses.map(c => <SelectItem key={c} value={c} className="rounded-xl font-bold">{c}</SelectItem>)}
+            <SelectContent className="rounded-xl border-none shadow-xl">
+              <SelectItem value="all" className="text-xs font-bold">All Classes</SelectItem>
+              {uniqueClasses.map(c => <SelectItem key={c} value={c} className="text-xs font-bold">{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="md:col-span-3">
+          <Select value={filterGender} onValueChange={setFilterGender}>
+            <SelectTrigger className="h-11 rounded-xl border-none shadow-sm bg-white font-bold text-slate-600 px-4 text-[10px] uppercase tracking-widest">
+              <div className="flex items-center gap-2">
+                <Users size={14} className="text-slate-300" />
+                <span>{filterGender === 'all' ? 'All Genders' : filterGender}</span>
+              </div>
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-none shadow-xl">
+              <SelectItem value="all" className="text-xs font-bold">All Genders</SelectItem>
+              <SelectItem value="Male" className="text-xs font-bold">Male / Boys</SelectItem>
+              <SelectItem value="Female" className="text-xs font-bold">Female / Girls</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      <Card className="border-none shadow-sm shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
+      <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest">Identify Profile</th>
-                <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-center">Division</th>
-                <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-center">Financial Status</th>
-                <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-right">Operational Actions</th>
+                <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest">Identify Profile</th>
+                <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-center">Division</th>
+                <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-center">Financial Status</th>
+                <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100/60">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-10 py-20 text-center">
-                    <div className="flex flex-col items-center gap-4">
-                      <Archive size={48} className="text-slate-200" />
-                      <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No records matching your search queries</p>
-                    </div>
+                  <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                    No student records found
                   </td>
                 </tr>
               ) : (
                 filteredStudents.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50/50 transition-all duration-300 group">
-                    <td className="px-10 py-8">
-                      <div className="flex items-center gap-6">
+                  <tr key={row.id} className="hover:bg-slate-50/30 transition-all group">
+                    <td className="px-6 py-3.5">
+                      <div className="flex items-center gap-4">
                         <div className="relative">
-                          <div className="w-16 h-16 rounded-3xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-xl group-hover:bg-accent group-hover:text-white transition-all transform group-hover:rotate-6 shadow-sm border border-slate-200/50">
+                          <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm transition-all", 
+                            row.gender === 'Female' ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-600")}>
                             {row.name.charAt(0)}
                           </div>
                           {row.isActive !== false && (
-                            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-4 border-white shadow-sm shadow-emerald-500/20" />
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white shadow-sm" />
                           )}
                         </div>
                         <div>
-                          <p className="font-black text-slate-900 text-lg tracking-tight leading-none mb-1.5">{row.name}</p>
-                          <div className="flex items-center gap-3">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">S/O {row.parentName}</span>
+                          <p className="font-black text-slate-900 text-sm tracking-tight leading-none mb-1">{row.name}</p>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">S/O {row.parentName}</span>
                             <span className="w-1 h-1 bg-slate-200 rounded-full" />
-                            <code className="text-[10px] font-black text-accent uppercase tracking-widest">ID {row.rollNumber}</code>
+                            <code className="text-[9px] font-bold text-accent uppercase tracking-widest">ID {row.rollNumber}</code>
+                            {row.gender && (
+                              <>
+                                <span className="w-1 h-1 bg-slate-200 rounded-full" />
+                                <span className={cn("text-[9px] font-bold uppercase tracking-widest", 
+                                  row.gender === 'Female' ? "text-rose-400" : "text-blue-400")}>
+                                  {row.gender}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-10 py-8 text-center">
-                      <Badge className="bg-indigo-50 text-indigo-600 border-none px-5 py-2 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm">
+                    <td className="px-6 py-3.5 text-center">
+                      <Badge className="bg-indigo-50 text-indigo-600 border-none px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-none">
                         Grade {row.grade}
                       </Badge>
                     </td>
-                    <td className="px-10 py-8 text-center">
+                    <td className="px-6 py-3.5 text-center">
                       <div className="flex flex-col items-center">
-                        <span className="font-black text-slate-900 text-base">PKR {row.monthlyFee.toLocaleString()}</span>
-                        {row.arrears > 0 ? (
-                          <Badge className="bg-rose-50 text-rose-500 border-none px-3 py-1 rounded-full text-[9px] font-black mt-2 uppercase tracking-tight">
-                            Outstanding: {row.arrears.toLocaleString()}
-                          </Badge>
-                        ) : (
-                          <span className="text-[9px] text-emerald-500 font-black mt-2 uppercase tracking-widest opacity-60">Settled Account</span>
+                        <span className="font-black text-slate-900 text-sm">PKR {Number(row.monthlyFee).toLocaleString()}</span>
+                        {row.arrears > 0 && (
+                          <span className="text-[8px] font-black text-rose-500 uppercase tracking-tight mt-0.5">
+                            Arrears: {Number(row.arrears).toLocaleString()}
+                          </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-10 py-8 text-right">
-                      <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(row)} className="h-12 w-12 rounded-2xl text-slate-400 hover:text-accent hover:bg-accent/5 hover:scale-110 active:scale-95 transition-all">
-                          <Edit size={20} />
+                    <td className="px-6 py-3.5 text-right">
+                      <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(row)} className="h-8 w-8 rounded-lg text-slate-400 hover:text-accent hover:bg-accent/5 transition-all">
+                          <Edit2 size={14} />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => onDeleteStudent(row.id)} className="h-12 w-12 rounded-2xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 hover:scale-110 active:scale-95 transition-all">
-                          <Trash2 size={20} />
+                        <Button variant="ghost" size="icon" onClick={() => onDeleteStudent(row.id)} className="h-8 w-8 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all">
+                          <Trash2 size={14} />
                         </Button>
                       </div>
                     </td>
@@ -1424,38 +1492,38 @@ function TeachersView({
   };
 
   return (
-    <div className="space-y-10 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-slate-200/60 no-print">
+    <div className="space-y-6 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200/60 no-print">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Administrative Core</h2>
-          <p className="text-slate-500 font-bold mt-2 uppercase tracking-[0.2em] text-[10px]">H.R. Management • Financial Operations</p>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Administrative Core</h2>
+          <p className="text-slate-500 font-bold mt-1 uppercase tracking-[0.15em] text-[8px]">H.R. Management • Fiscal Payroll Operations</p>
         </div>
-        <div className="flex items-center gap-3 bg-slate-100 p-1.5 rounded-[1.2rem]">
+        <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
           <Button 
             onClick={() => setView('staff')} 
             variant="ghost" 
             className={cn(
-              "h-12 px-8 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all",
+              "h-9 px-6 rounded-lg font-black uppercase tracking-widest text-[9px] transition-all",
               view === 'staff' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
             )}
           >
-            Faculty Directory
+            Staff
           </Button>
           <Button 
             onClick={() => setView('payroll')} 
             variant="ghost" 
             className={cn(
-              "h-12 px-8 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all",
+              "h-9 px-6 rounded-lg font-black uppercase tracking-widest text-[9px] transition-all",
               view === 'payroll' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
             )}
           >
-            Payroll Ledger
+            Payroll
           </Button>
         </div>
       </div>
 
       {view === 'staff' ? (
-        <div className="space-y-8">
+        <div className="space-y-6">
           <div className="flex justify-end no-print">
             <Button 
               onClick={() => {
@@ -1463,58 +1531,58 @@ function TeachersView({
                 setStaffForm({ name: '', designation: '', employeeId: '', contactNumber: '', baseSalary: '', qualification: '', assignedClass: '', loginId: '', password: '', role: 'teacher', isTeaching: true });
                 setOpenAddStaff(true);
               }} 
-              className="bg-indigo-600 hover:bg-indigo-700 text-white h-14 px-10 rounded-[1.2rem] font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl shadow-indigo-600/25"
+              className="bg-slate-900 hover:bg-slate-800 text-white h-9 px-6 rounded-xl font-black uppercase tracking-widest text-[9px] shadow-lg shadow-slate-900/10"
             >
-              <UserPlus2 size={20} className="mr-3" /> New Appointment
+              <UserPlus2 size={14} className="mr-2" /> New Appointment
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {teachers.map((teacher, index) => (
               <motion.div
                 key={teacher.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <Card className="border-none shadow-sm shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white group hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-500 hover:-translate-y-2">
-                  <div className="p-8">
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center text-slate-300 font-black text-2xl group-hover:bg-indigo-600 group-hover:text-white transition-all transform group-hover:rotate-6 shadow-sm border border-slate-100">
+                <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white group hover:shadow-md transition-all">
+                  <div className="p-6">
+                    <div className="flex justify-between items-start mb-5">
+                      <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 font-black text-xl group-hover:bg-slate-900 group-hover:text-white transition-all transform group-hover:rotate-3 shadow-sm border border-slate-100">
                         {teacher.name.charAt(0)}
                       </div>
-                      <div className="flex bg-slate-50 rounded-xl p-1 no-print">
-                        <Button variant="ghost" size="icon" onClick={() => handleEditStaffRequest(teacher)} className="h-9 w-9 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-white shadow-sm">
-                          <Edit3 size={16} />
+                      <div className="flex bg-slate-50/50 rounded-lg p-1 no-print">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditStaffRequest(teacher)} className="h-7 w-7 rounded-lg text-slate-300 hover:text-indigo-600 hover:bg-white">
+                          <Edit3 size={12} />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => { setSelectedStaff(teacher); setOpenPayroll(true); }} className="h-9 w-9 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-white shadow-sm">
-                          <Wallet size={16} />
+                        <Button variant="ghost" size="icon" onClick={() => { setSelectedStaff(teacher); setOpenPayroll(true); }} className="h-7 w-7 rounded-lg text-slate-300 hover:text-emerald-600 hover:bg-white">
+                          <Wallet size={12} />
                         </Button>
                       </div>
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-slate-900 tracking-tight leading-none mb-1.5">{teacher.name}</h3>
-                      <p className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-6">{teacher.designation}</p>
+                      <h3 className="text-base font-black text-slate-900 tracking-tight leading-none mb-1 uppercase italic">{teacher.name}</h3>
+                      <p className="text-[8px] font-black text-indigo-600 uppercase tracking-widest mb-4">{teacher.designation}</p>
                       
-                      <div className="grid grid-cols-2 gap-3 mb-6">
-                        <div className="bg-slate-50 p-3 rounded-2xl">
-                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Emp ID</p>
-                          <p className="text-xs font-bold text-slate-700">#{teacher.employeeId}</p>
+                      <div className="grid grid-cols-2 gap-2 mb-4">
+                        <div className="bg-slate-50/50 p-2.5 rounded-xl">
+                          <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">ID</p>
+                          <p className="text-[10px] font-bold text-slate-700">#{teacher.employeeId}</p>
                         </div>
-                        <div className="bg-slate-50 p-3 rounded-2xl">
-                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Salary</p>
-                          <p className="text-xs font-bold text-slate-700">PKR {teacher.baseSalary.toLocaleString()}</p>
+                        <div className="bg-slate-50/50 p-2.5 rounded-xl">
+                          <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Salary</p>
+                          <p className="text-[10px] font-bold text-slate-700">Rs. {Number(teacher.baseSalary).toLocaleString()}</p>
                         </div>
                       </div>
                       
-                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <GraduationCap size={14} className="opacity-50" />
+                      <div className="flex items-center justify-between text-[8px] font-black text-slate-400 uppercase tracking-widest pt-3 border-t border-slate-50">
+                        <div className="flex items-center gap-1.5 leading-none">
+                          <GraduationCap size={12} className="opacity-50" />
                           {teacher.qualification}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Layout size={14} className="opacity-50" />
-                          Grade {teacher.assignedClass || 'N/A'}
+                        <div className="flex items-center gap-1.5 leading-none">
+                          <Layout size={12} className="opacity-50" />
+                          Class {teacher.assignedClass || 'N/A'}
                         </div>
                       </div>
                     </div>
@@ -1525,13 +1593,13 @@ function TeachersView({
           </div>
         </div>
       ) : (
-        <Card className="border-none shadow-sm shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
+        <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest">Employee Detail</th>
-                  <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest">Billing Month</th>
+                  <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest">Detail</th>
+                  <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest">Month</th>
                   <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-center">Net Amount</th>
                   <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-center">Payment Status</th>
                   <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-right">Verification Date</th>
@@ -1743,35 +1811,35 @@ function AttendanceView({
 
   return (
     <div className="space-y-10 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-slate-200/60 no-print">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-200/60 no-print">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Attendance Terminal</h2>
-          <p className="text-slate-500 font-bold mt-2 uppercase tracking-[0.2em] text-[10px]">Institutional Registry & Parent Notifications</p>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Attendance Terminal</h2>
+          <p className="text-slate-500 font-bold mt-1 uppercase tracking-[0.2em] text-[9px]">Institutional Registry & Notifications</p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 bg-slate-100 p-2 rounded-2xl">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-2">Session Date</Label>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl">
+            <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-2">Date</Label>
             <Input 
               type="date" 
               value={selectedDate} 
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-10 w-44 rounded-xl border-none font-bold bg-white shadow-sm" 
+              className="h-9 w-36 rounded-lg border-none font-bold bg-white shadow-sm text-xs" 
             />
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <div className="lg:col-span-3 space-y-8">
-          <Card className="border-none shadow-sm shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
-            <div className="p-10 border-b border-slate-100 bg-slate-50/10">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3 space-y-6">
+          <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white">
+            <div className="p-6 border-b border-slate-100 bg-slate-50/10">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Active Scholar Registry</h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mt-1">Roll Call Protocol v2024.1</p>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Scholar Registry</h3>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mt-1">Daily Roll Call Protocol</p>
                 </div>
-                <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-[9px] uppercase tracking-widest px-4 py-1.5 rounded-full">
-                  Verified Data
+                <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-[8px] uppercase tracking-widest px-3 py-1 rounded-lg">
+                  Live Data
                 </Badge>
               </div>
             </div>
@@ -1780,30 +1848,31 @@ function AttendanceView({
               <table className="w-full text-sm text-left">
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-slate-100">
-                    <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest">Scholar Profile</th>
-                    <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-center">Status Matrix</th>
-                    <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-center">Parent Notification</th>
-                    <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-right">Remarks</th>
+                    <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest">Scholar Profile</th>
+                    <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-center">Status</th>
+                    <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-center">Notification</th>
+                    <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-right">Notes</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100/60">
                   {students.map((student) => {
                     const att = attendance.find(a => a.studentId === student.id && a.date === selectedDate);
                     return (
-                      <tr key={student.id} className="hover:bg-slate-50/30 transition-all duration-300 group">
-                        <td className="px-10 py-8">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center font-black text-xs text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all transform group-hover:rotate-6">
+                      <tr key={student.id} className="hover:bg-slate-50/20 transition-all group">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs transition-all", 
+                              student.gender === 'Female' ? "bg-rose-50 text-rose-400" : "bg-blue-50 text-blue-400")}>
                               {student.name.charAt(0)}
                             </div>
                             <div>
-                              <p className="font-black text-slate-900 text-base leading-none mb-1">{student.name}</p>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">Roll: {student.rollNumber}</p>
+                              <p className="font-black text-slate-900 text-sm leading-none mb-1">{student.name}</p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic">Roll: {student.rollNumber}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-10 py-8">
-                          <div className="flex justify-center gap-2">
+                        <td className="px-6 py-4">
+                          <div className="flex justify-center gap-1.5">
                             {[
                               { label: 'P', val: 'present', color: 'emerald' },
                               { label: 'A', val: 'absent', color: 'rose' },
@@ -1814,10 +1883,10 @@ function AttendanceView({
                                 key={s.val}
                                 onClick={() => onMarkAttendance(student.id, s.val as Attendance['status'])}
                                 className={cn(
-                                  "w-10 h-10 rounded-xl font-black text-xs transition-all border-2 active:scale-90",
+                                  "w-8 h-8 rounded-lg font-black text-[10px] transition-all border active:scale-90",
                                   att?.status === s.val 
-                                    ? `bg-${s.color}-600 border-${s.color}-600 text-white shadow-lg shadow-${s.color}-600/25`
-                                    : "border-slate-100 text-slate-400 hover:border-slate-200 hover:text-slate-600"
+                                    ? `bg-${s.color}-600 border-${s.color}-600 text-white shadow-md`
+                                    : "border-slate-100 text-slate-300 hover:border-slate-200"
                                 )}
                               >
                                 {s.label}
@@ -1825,24 +1894,24 @@ function AttendanceView({
                             ))}
                           </div>
                         </td>
-                        <td className="px-10 py-8 text-center">
+                        <td className="px-6 py-4 text-center">
                           {(att?.status === 'absent' || att?.status === 'late') ? (
                             <a 
                               href={getWhatsAppLink(student, att.status)} 
                               target="_blank" 
                               rel="noreferrer"
-                              className="inline-flex items-center gap-2.5 bg-emerald-50 text-emerald-600 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm hover:shadow-emerald-600/20 active:scale-95"
+                              className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-95"
                             >
-                              <MessageCircle size={14} className="opacity-80" /> Notify Parent
+                              <MessageCircle size={12} /> Notify
                             </a>
                           ) : (
-                            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center justify-center gap-2">
-                              <ShieldCheck size={14} className="opacity-30" /> Record Secure
+                            <span className="text-[9px] font-black text-slate-200 uppercase tracking-widest flex items-center justify-center gap-1.5">
+                              <ShieldCheck size={12} className="opacity-30" /> Secure
                             </span>
                           )}
                         </td>
-                        <td className="px-10 py-8 text-right">
-                          <Input placeholder="Add internal note..." className="h-10 text-[10px] font-bold border-none bg-slate-50 group-hover:bg-white transition-colors rounded-xl text-right max-w-[150px] inline-block shadow-inner" />
+                        <td className="px-6 py-4 text-right">
+                          <Input placeholder="..." className="h-8 text-[9px] font-bold border-none bg-slate-50 group-hover:bg-white transition-colors rounded-lg text-right max-w-[100px] inline-block shadow-inner" />
                         </td>
                       </tr>
                     );
@@ -1853,19 +1922,19 @@ function AttendanceView({
           </Card>
         </div>
 
-        <div className="space-y-8">
-          <Card className="border-none shadow-2xl shadow-indigo-600/10 rounded-[2.5rem] bg-indigo-950 text-white overflow-hidden relative min-h-[600px]">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16" />
-            <div className="p-8 border-b border-white/5 relative z-10 flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center shadow-inner">
-                <Trophy size={24} className="text-indigo-400" />
+        <div className="space-y-6">
+          <Card className="border-none shadow-xl shadow-indigo-600/5 rounded-2xl bg-indigo-950 text-white overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-2xl -mr-12 -mt-12" />
+            <div className="p-6 border-b border-white/5 relative z-10 flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center shadow-inner">
+                <Trophy size={18} className="text-indigo-300" />
               </div>
               <div>
-                <h3 className="text-lg font-black tracking-tight leading-none mb-1">Prime Vanguard</h3>
-                <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Monthly Perfect Logs</p>
+                <h3 className="text-base font-black tracking-tight leading-none mb-1">Prime Squad</h3>
+                <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Monthly Perfect Logs</p>
               </div>
             </div>
-            <ScrollArea className="h-full max-h-[500px] p-6 relative z-10">
+            <ScrollArea className="max-h-[400px] p-5 relative z-10">
               {starStudents.length > 0 ? (
                 <div className="space-y-4">
                   {starStudents.map(student => (
@@ -2260,66 +2329,66 @@ function FeesView({
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card className="border-none shadow-sm bg-slate-900 text-white rounded-2xl overflow-hidden">
-            <CardContent className="p-8">
-              <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-4">Current Month Demand</p>
-              <h3 className="text-3xl font-black tracking-tighter leading-none mb-2">Rs. {students.reduce((sum, s) => sum + (Number(s.monthlyFee) || 0), 0).toLocaleString()}</h3>
-              <p className="text-[10px] font-bold text-emerald-400/60 uppercase tracking-widest">Active Tuition Pool</p>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <Card className="border-none shadow-sm bg-slate-900 text-white rounded-xl overflow-hidden group hover:shadow-md transition-all">
+            <CardContent className="p-5">
+              <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest mb-3">Revenue Potential</p>
+              <h3 className="text-xl font-black tracking-tight leading-none mb-1">Rs. {students.reduce((sum, s) => sum + (Number(s.monthlyFee) || 0), 0).toLocaleString()}</h3>
+              <p className="text-[7px] font-bold text-emerald-400/60 uppercase tracking-widest">Expected Tuition Pool</p>
             </CardContent>
           </Card>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Card className="border-none shadow-sm bg-white rounded-2xl overflow-hidden">
-            <CardContent className="p-8">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Total Outstanding</p>
-              <h3 className="text-3xl font-black text-rose-600 tracking-tighter leading-none mb-2">Rs. {totalPending.toLocaleString()}</h3>
-              <p className="text-[10px] font-bold text-rose-500/60 uppercase tracking-widest">{pendingStudents.length} Students Pending</p>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <Card className="border-none shadow-sm bg-rose-50 text-rose-600 rounded-xl overflow-hidden group hover:shadow-md transition-all">
+            <CardContent className="p-5">
+              <p className="text-[8px] font-black text-rose-400 uppercase tracking-widest mb-3">Total Receivables</p>
+              <h3 className="text-xl font-black text-rose-600 tracking-tight leading-none mb-1">Rs. {totalPending.toLocaleString()}</h3>
+              <p className="text-[7px] font-bold text-rose-500/60 uppercase tracking-widest">{pendingStudents.length} Profiles Pending</p>
             </CardContent>
           </Card>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <Card className="border-none shadow-sm bg-white rounded-2xl overflow-hidden">
-            <CardContent className="p-8">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">System Inventory</p>
-              <h3 className="text-3xl font-black text-slate-900 tracking-tighter leading-none mb-2">{feeChallans.length}</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Generated Challans</p>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <Card className="border-none shadow-sm bg-white rounded-xl overflow-hidden group hover:shadow-md transition-all">
+            <CardContent className="p-5">
+              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-3">Challan Registry</p>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight leading-none mb-1">{feeChallans.length}</h3>
+              <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">Issued Documents</p>
             </CardContent>
           </Card>
         </motion.div>
       </div>
 
-      <div className="flex items-center gap-2 bg-slate-100/50 p-1 rounded-xl w-fit">
-        <Button onClick={() => setActiveTab('all')} variant="ghost" className={cn("h-10 px-6 rounded-lg font-bold text-[10px] uppercase tracking-widest transition-all", activeTab === 'all' ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:text-slate-900")}>All Students</Button>
-        <Button onClick={() => setActiveTab('pending')} variant="ghost" className={cn("h-10 px-6 rounded-lg font-bold text-[10px] uppercase tracking-widest transition-all", activeTab === 'pending' ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:text-slate-900")}>Pending Dues ({pendingStudents.length})</Button>
-        <Button onClick={() => setActiveTab('challans')} variant="ghost" className={cn("h-10 px-6 rounded-lg font-bold text-[10px] uppercase tracking-widest transition-all", activeTab === 'challans' ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:text-slate-900")}>Challan Management</Button>
+      <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl w-fit">
+        <Button onClick={() => setActiveTab('all')} variant="ghost" className={cn("h-8 px-5 rounded-lg font-black text-[8px] uppercase tracking-widest transition-all", activeTab === 'all' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600")}>Scholar Registry</Button>
+        <Button onClick={() => setActiveTab('pending')} variant="ghost" className={cn("h-8 px-5 rounded-lg font-black text-[8px] uppercase tracking-widest transition-all", activeTab === 'pending' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600")}>Unpaid ({pendingStudents.length})</Button>
+        <Button onClick={() => setActiveTab('challans')} variant="ghost" className={cn("h-8 px-5 rounded-lg font-black text-[8px] uppercase tracking-widest transition-all", activeTab === 'challans' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600")}>Archive</Button>
       </div>
 
       {activeTab !== 'challans' ? (
-        <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white no-print">
-          <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white no-print">
+          <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">Student Fee Records</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Manage monthly fees and dues</p>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">Fee Ledger</h3>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 italic">Monthly collection management</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <Button 
                 onClick={() => {
                   const currentMonth = new Date().toLocaleString('default', { month: 'long' });
-                  alert(`Defaulter Summary for ${currentMonth}:\n\nTotal Students Unpaid: ${pendingStudents.length}\nTotal Outstanding Amount: Rs. ${totalPending.toLocaleString()}\n(Calculation: Base Fees + Pending Arrears)`);
+                  alert(`Snapshot for ${currentMonth}:\n\nDefaulters: ${pendingStudents.length}\nOutstanding: Rs. ${totalPending.toLocaleString()}`);
                 }}
                 variant="outline" 
-                className="h-10 px-4 rounded-xl border-rose-100 text-rose-600 font-bold uppercase tracking-widest text-[9px] hover:bg-rose-50"
+                className="h-8 px-3 rounded-lg border-rose-100 text-rose-500 font-bold uppercase tracking-widest text-[8px] hover:bg-rose-50"
               >
                 Defaulters Summary
               </Button>
-              <Button onClick={() => setOpenManualChallan(true)} variant="outline" className="h-10 px-4 rounded-xl border-blue-100 text-blue-600 font-bold uppercase tracking-widest text-[9px] hover:bg-blue-50">
-                <PlusCircle size={14} className="mr-2" /> Generate Individual Challan
+              <Button onClick={() => setOpenManualChallan(true)} variant="outline" className="h-8 px-3 rounded-lg border-blue-100 text-blue-500 font-bold uppercase tracking-widest text-[8px] hover:bg-blue-50">
+                Custom Challan
               </Button>
-              <Button onClick={generateBulkChallansAction} className="bg-blue-600 hover:bg-blue-700 text-white h-10 px-6 rounded-xl font-bold uppercase tracking-widest text-[9px] shadow-lg shadow-blue-600/20">
-                <Printer size={14} className="mr-2" /> Bulk Generate Challans
+              <Button onClick={generateBulkChallansAction} className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-4 rounded-lg font-bold uppercase tracking-widest text-[8px] shadow-sm">
+                Bulk Print
               </Button>
             </div>
           </div>
@@ -2327,15 +2396,15 @@ function FeesView({
             <table className="w-full text-sm text-left">
               <thead>
                 <tr className="bg-slate-50/50">
-                  <th className="px-8 py-5 font-bold uppercase text-[10px] text-slate-400 tracking-widest">Student</th>
-                  <th className="px-8 py-5 font-bold uppercase text-[10px] text-slate-400 tracking-widest">Monthly Fee</th>
-                  <th className="px-8 py-5 font-bold uppercase text-[10px] text-slate-400 tracking-widest">Arrears</th>
-                  <th className="px-8 py-5 font-bold uppercase text-[10px] text-slate-400 tracking-widest text-blue-600">Total Payable</th>
-                  <th className="px-8 py-5 font-bold uppercase text-[10px] text-slate-400 tracking-widest text-center">Dues Status</th>
-                  <th className="px-8 py-5 font-bold uppercase text-[10px] text-slate-400 tracking-widest text-right">Action</th>
+                  <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest">Scholar Info</th>
+                  <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-center">Monthly</th>
+                  <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-center">Arrears</th>
+                  <th className="px-6 py-4 font-black uppercase text-[9px] text-indigo-400 tracking-widest text-center">Total Payable</th>
+                  <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-center">Status</th>
+                  <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-right">Operations</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100/50">
                 {displayList.map((student) => {
                   const currentMonthPaid = feeRecords.find(r => 
                     r.studentId === student.id && 
@@ -2344,51 +2413,49 @@ function FeesView({
                   );
                   
                   return (
-                    <tr key={student.id} className="hover:bg-slate-50/30 transition-colors">
-                      <td className="px-8 py-5">
-                        <p className="font-bold text-slate-900 leading-none mb-1">{student.name}</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-[10px] font-medium text-slate-400">Grade: {student.grade} - {student.section}</p>
-                          <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                          <p className="text-[10px] font-bold text-accent">Roll: {student.rollNumber}</p>
+                    <tr key={student.id} className="hover:bg-slate-50/20 transition-all group">
+                      <td className="px-6 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8 border border-slate-100">
+                            <AvatarFallback className="bg-slate-50 text-slate-400 font-black text-[10px]">{student.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-black text-slate-900 text-[11px] leading-none mb-1">{student.name}</p>
+                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Roll: {student.rollNumber} • {student.grade}</p>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-8 py-5 font-bold text-slate-700">Rs. {(Number(student.monthlyFee) || 0).toLocaleString()}</td>
-                      <td className="px-8 py-5 font-bold text-rose-500">Rs. {(Number(student.arrears) || 0).toLocaleString()}</td>
-                      <td className="px-8 py-5 font-black text-blue-600">Rs. {( (Number(student.monthlyFee) || 0) + (Number(student.arrears) || 0) ).toLocaleString()}</td>
-                      <td className="px-8 py-5 text-center">
-                        <Badge className={cn("px-4 py-1 rounded-full font-bold text-[9px] uppercase tracking-widest border-none", currentMonthPaid ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500")}>
-                          {currentMonthPaid ? 'Paid' : 'Unpaid'}
+                      <td className="px-6 py-3.5 text-center text-[11px] font-bold text-slate-600">Rs. {(Number(student.monthlyFee) || 0).toLocaleString()}</td>
+                      <td className="px-6 py-3.5 text-center text-[11px] font-bold text-rose-500">Rs. {(Number(student.arrears) || 0).toLocaleString()}</td>
+                      <td className="px-6 py-3.5 text-center font-black text-indigo-600 text-[11px]">Rs. {( (Number(student.monthlyFee) || 0) + (Number(student.arrears) || 0) ).toLocaleString()}</td>
+                      <td className="px-6 py-3.5 text-center">
+                        <Badge className={cn("px-3 py-1 rounded-full font-black text-[8px] uppercase tracking-widest border-none shadow-sm", currentMonthPaid ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500")}>
+                          {currentMonthPaid ? 'Received' : 'Pending'}
                         </Badge>
                       </td>
-                      <td className="px-8 py-5 text-right">
-                        <div className="flex justify-end items-center gap-2">
-                          <Button variant="outline" size="sm" onClick={() => generateIndividualChallan(student)} className="h-8 border-emerald-100 text-emerald-600 hover:bg-emerald-50 text-[9px] font-bold uppercase tracking-widest rounded-lg">
-                            <Receipt size={12} className="mr-1.5" /> Challan
-                          </Button>
+                      <td className="px-6 py-3.5 text-right">
+                        <div className="flex justify-end items-center gap-1.5">
                           <Button 
-                            variant="outline" 
-                            size="sm" 
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-4 rounded-lg font-black uppercase tracking-widest text-[8px] transition-all"
                             onClick={() => {
                               setSelectedStudent(student);
                               const totalDue = (Number(student.monthlyFee) || 0) + (Number(student.arrears) || 0);
                               setFeeForm(prev => ({ ...prev, amount: totalDue.toString() }));
                               setOpenRecord(true);
                             }}
-                            className="h-8 border-blue-100 text-blue-600 hover:bg-blue-50 text-[9px] font-bold uppercase tracking-widest rounded-lg"
                           >
-                            Record Fee
+                            Deposit
                           </Button>
                           <Button 
                             variant="ghost" 
-                            size="sm" 
+                            size="icon" 
                             onClick={() => {
                               setSelectedStudent(student);
                               setOpenLedger(true);
                             }}
-                            className="h-8 text-slate-400 hover:text-slate-600 text-[9px] font-bold uppercase tracking-widest rounded-lg"
+                            className="h-7 w-7 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
                           >
-                            Ledger
+                            <FileText size={12} />
                           </Button>
                         </div>
                       </td>
@@ -2400,17 +2467,17 @@ function FeesView({
           </div>
         </Card>
       ) : (
-        <Card className="border-none shadow-sm shadow-slate-200/50 rounded-[3rem] overflow-hidden bg-white">
-          <CardHeader className="p-12 flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-100 bg-slate-50/20">
+        <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white">
+          <CardHeader className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-50 bg-slate-50/20">
             <div>
-              <CardTitle className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">Issued Challans</CardTitle>
-              <CardDescription className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-3 italic">History of fee challans generated</CardDescription>
+              <CardTitle className="text-lg font-black text-slate-900 tracking-tight leading-none mb-1">Archive</CardTitle>
+              <CardDescription className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Fee challan transaction history</CardDescription>
             </div>
-            <div className="relative w-full md:w-[400px] group">
-              <Search size={22} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+            <div className="relative w-full md:w-[300px] group">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
               <Input 
-                placeholder="Search by student name or challan ID..." 
-                className="pl-14 h-16 rounded-2xl border-none bg-white shadow-inner font-bold text-base focus:ring-indigo-100 transition-all placeholder:text-slate-300"
+                placeholder="Search history..." 
+                className="pl-11 h-10 rounded-xl border-none bg-white shadow-sm font-bold text-xs focus:ring-1 focus:ring-indigo-100 transition-all"
                 value={challanSearch}
                 onChange={(e) => setChallanSearch(e.target.value)}
               />
@@ -2420,33 +2487,33 @@ function FeesView({
              <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="px-12 py-8 font-black uppercase text-[10px] text-slate-400 tracking-widest">Artifact ID</th>
-                    <th className="px-12 py-8 font-black uppercase text-[10px] text-slate-400 tracking-widest">Entity Info</th>
-                    <th className="px-12 py-8 font-black uppercase text-[10px] text-slate-400 tracking-widest text-center">Temporal Window</th>
-                    <th className="px-12 py-8 font-black uppercase text-[10px] text-slate-400 tracking-widest text-center">Net Value</th>
-                    <th className="px-12 py-8 font-black uppercase text-[10px] text-slate-400 tracking-widest text-center">Status</th>
-                    <th className="px-12 py-8 font-black uppercase text-[10px] text-slate-400 tracking-widest text-right">Actions</th>
+                  <tr className="bg-slate-50/50 border-b border-slate-50">
+                    <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest">ID</th>
+                    <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest">Subject</th>
+                    <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-center">Period</th>
+                    <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-center">Amount</th>
+                    <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-center">Status</th>
+                    <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100/60 font-medium">
+                <tbody className="divide-y divide-slate-100/50 font-medium text-xs">
                   {filteredChallans.length > 0 ? filteredChallans.map((challan) => {
                     const student = students.find(s => s.id === challan.studentId);
                     return (
-                      <tr key={challan.id} className="hover:bg-slate-50/50 transition-all duration-300 group">
-                        <td className="px-12 py-10 font-black text-indigo-600 tracking-widest font-mono text-[11px] group-hover:scale-105 transition-transform origin-left">{challan.id}</td>
-                        <td className="px-12 py-10">
-                          <div className="font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight leading-none mb-1">{student?.name || 'Unknown Entity'}</div>
-                          <div className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">Grade {student?.grade}</div>
+                      <tr key={challan.id} className="hover:bg-slate-50/20 transition-all group">
+                        <td className="px-6 py-3.5 font-black text-indigo-600 tracking-widest font-mono text-[10px]">{challan.id}</td>
+                        <td className="px-6 py-3.5">
+                          <div className="font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight leading-none mb-0.5">{student?.name || 'N/A'}</div>
+                          <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest italic">Grade {student?.grade}</div>
                         </td>
-                        <td className="px-12 py-10 text-center">
-                          <p className="font-black text-slate-700 leading-none mb-1">{challan.month} {challan.year}</p>
-                          <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Billing Cycle</p>
+                        <td className="px-6 py-3.5 text-center">
+                          <p className="font-black text-slate-700 leading-none mb-0.5">{challan.month} {challan.year}</p>
+                          <p className="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Cycle</p>
                         </td>
-                        <td className="px-12 py-10 font-black text-slate-900 text-lg text-center tracking-tighter">Rs. {challan.totalPayable.toLocaleString()}</td>
-                        <td className="px-12 py-10 text-center">
+                        <td className="px-6 py-3.5 font-black text-slate-900 text-center tracking-tighter">Rs. {challan.totalPayable.toLocaleString()}</td>
+                        <td className="px-6 py-3.5 text-center">
                           <Badge className={cn(
-                            "px-6 py-2.5 rounded-full font-black text-[9px] uppercase tracking-[0.2em] border-none shadow-sm",
+                            "px-3 py-1 rounded-full font-black text-[8px] uppercase tracking-widest border-none shadow-sm",
                             challan.status === 'paid' ? 'bg-emerald-50 text-emerald-600' :
                             challan.status === 'cancelled' ? 'bg-rose-50 text-rose-600' :
                             'bg-amber-50 text-amber-600'
@@ -2454,18 +2521,18 @@ function FeesView({
                             {challan.status}
                           </Badge>
                         </td>
-                        <td className="px-12 py-10">
-                          <div className="flex justify-end gap-3 no-print">
+                        <td className="px-6 py-3.5">
+                          <div className="flex justify-end gap-1.5 no-print">
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-10 w-10 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-white shadow-sm border border-slate-100 hover:rotate-6 transition-all" 
+                              className="h-7 w-7 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-white shadow-sm border border-slate-100 transition-all" 
                               onClick={() => {
                                 setSelectedChallan(challan);
                                 setOpenChallanDetail(true);
                               }}
                             >
-                              <Eye size={14} />
+                              <Eye size={12} />
                             </Button>
                             <Button 
                               variant="ghost" 
@@ -2476,13 +2543,13 @@ function FeesView({
                                 setOpenChallanEdit(true);
                               }}
                             >
-                              <Edit size={14} />
+                              <Edit size={12} />
                             </Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-indigo-600" onClick={() => printChallan(challan)}>
-                              <Printer size={14} />
+                              <Printer size={12} />
                             </Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600" onClick={() => onDeleteChallan(challan.id)}>
-                              <Trash2 size={14} />
+                              <Trash2 size={12} />
                             </Button>
                           </div>
                         </td>
@@ -2490,7 +2557,7 @@ function FeesView({
                     );
                   }) : (
                     <tr>
-                      <td colSpan={6} className="p-10 text-center italic text-muted-foreground">No challans found.</td>
+                      <td colSpan={6} className="p-10 text-center italic text-muted-foreground text-xs">No records found.</td>
                     </tr>
                   )}
                 </tbody>
@@ -2682,49 +2749,67 @@ function FeesView({
 
       {/* Record Fee Dialog */}
       <Dialog open={openRecord} onOpenChange={setOpenRecord}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Fee Deposit - {selectedStudent?.name}</DialogTitle>
-            <DialogDescription>Enter payment details to update student records.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleRecordFee} className="space-y-4 py-4">
-            <div className="bg-slate-50 p-4 rounded-xl space-y-2 mb-2">
-              <div className="flex justify-between text-[11px] font-bold">
-                <span className="text-slate-400 uppercase tracking-widest">Monthly Fee</span>
-                <span className="text-slate-900">Rs. {selectedStudent?.monthlyFee.toLocaleString()}</span>
+        <DialogContent className="sm:max-w-[350px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
+          <div className="bg-slate-900 p-6 text-white">
+            <DialogTitle className="text-lg font-black tracking-tight">Fee Deposit</DialogTitle>
+            <DialogDescription className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Student: {selectedStudent?.name}</DialogDescription>
+          </div>
+          <form onSubmit={handleRecordFee} className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-slate-50 rounded-xl">
+                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Monthly</p>
+                <p className="text-xs font-black text-slate-900">Rs. {selectedStudent?.monthlyFee.toLocaleString()}</p>
               </div>
-              <div className="flex justify-between text-[11px] font-bold">
-                <span className="text-slate-400 uppercase tracking-widest">Prev. Arrears</span>
-                <span className="text-rose-600">Rs. {(selectedStudent?.arrears || 0).toLocaleString()}</span>
-              </div>
-              <div className="h-px bg-slate-200 mt-2" />
-              <div className="flex justify-between text-sm font-black pt-1">
-                <span className="text-slate-900 uppercase tracking-widest">Total Dues</span>
-                <span className="text-blue-600">Rs. {(Number(selectedStudent?.monthlyFee || 0) + Number(selectedStudent?.arrears || 0)).toLocaleString()}</span>
+              <div className="p-3 bg-rose-50 rounded-xl">
+                <p className="text-[8px] font-black text-rose-400 uppercase tracking-widest">Arrears</p>
+                <p className="text-xs font-black text-rose-600">Rs. {(selectedStudent?.arrears || 0).toLocaleString()}</p>
               </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="amount" className="text-right text-xs font-bold uppercase text-slate-400">Payment</Label>
-              <Input id="amount" type="number" value={feeForm.amount} onChange={(e) => setFeeForm({...feeForm, amount: e.target.value})} className="col-span-3 h-12 rounded-xl text-sm font-bold" required />
+
+            <div className="bg-slate-50 p-3 rounded-xl flex items-center justify-between">
+              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total Dues</p>
+              <p className="text-sm font-black text-indigo-600">Rs. {(Number(selectedStudent?.monthlyFee || 0) + Number(selectedStudent?.arrears || 0)).toLocaleString()}</p>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right text-xs">Month</Label>
-              <Select value={feeForm.month} onValueChange={(v) => setFeeForm({...feeForm, month: v})}>
-                <SelectTrigger className="col-span-3 h-9 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                </SelectContent>
-              </Select>
+
+            <div className="space-y-1.5">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Amount Received</Label>
+              <Input 
+                type="number" 
+                value={feeForm.amount} 
+                onChange={(e) => setFeeForm({...feeForm, amount: e.target.value})} 
+                className="h-10 rounded-lg bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-black text-xs" 
+                placeholder="Enter paid amount..."
+                required 
+              />
+              {selectedStudent && (
+                 <p className={cn(
+                   "text-[9px] font-black uppercase tracking-widest pl-1 mt-1",
+                   (Number(selectedStudent.monthlyFee || 0) + Number(selectedStudent.arrears || 0) - Number(feeForm.amount || 0)) > 0 ? "text-rose-500" : "text-emerald-500"
+                 )}>
+                   Remaining Balance: Rs. {(Number(selectedStudent.monthlyFee || 0) + Number(selectedStudent.arrears || 0) - Number(feeForm.amount || 0)).toLocaleString()}
+                 </p>
+              )}
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right text-xs">Year</Label>
-              <Input value={feeForm.year} disabled className="col-span-3 h-9 text-xs bg-muted" />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Month</Label>
+                <Select value={feeForm.month} onValueChange={(v) => setFeeForm({...feeForm, month: v})}>
+                  <SelectTrigger className="h-9 text-[10px] font-bold rounded-lg"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {months.map(m => <SelectItem key={m} value={m} className="text-[10px] font-bold">{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Year</Label>
+                <Input value={feeForm.year} disabled className="h-9 text-[10px] font-bold bg-slate-50 rounded-lg border-transparent" />
+              </div>
             </div>
-            <DialogFooter className="pt-4">
-              <Button type="submit" className="bg-primary w-full h-10 text-xs font-bold flex items-center gap-2">
-                <MessageCircle size={16} /> Submit & Send WhatsApp Msg
-              </Button>
-            </DialogFooter>
+
+            <Button type="submit" className="w-full h-10 bg-accent text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-accent/20">
+              Update & Notify Parent
+            </Button>
           </form>
         </DialogContent>
       </Dialog>
@@ -3220,36 +3305,36 @@ function TimetableView({
 
 function ExamsView({ students }: { students: Student[] }) {
   return (
-    <div className="space-y-10 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-slate-200/60 no-print">
+    <div className="space-y-6 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/60 no-print">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Scholarship Metrics</h2>
-          <p className="text-slate-500 font-bold mt-2 uppercase tracking-[0.2em] text-[10px]">Academic Evaluation & Performance Analysis</p>
+          <h2 className="text-xl font-black text-slate-900 tracking-tight leading-none uppercase tracking-widest text-[10px]">Scholarship Metrics</h2>
+          <p className="text-slate-500 font-bold mt-1 uppercase tracking-[0.15em] text-[8px]">Academic Evaluation & Performance Analytics</p>
         </div>
-        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white h-14 px-10 rounded-[1.2rem] font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl shadow-indigo-600/25 transition-all hover:scale-105 active:scale-95">
-          <GraduationCap size={20} className="mr-3" /> New Examination
+        <Button className="bg-slate-900 hover:bg-slate-800 text-white h-9 px-6 rounded-xl font-black uppercase tracking-widest text-[9px] shadow-lg shadow-slate-900/10 transition-all active:scale-95">
+          <GraduationCap size={14} className="mr-2" /> New Examination
         </Button>
       </div>
 
-      <Card className="border-none shadow-sm shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
-        <div className="p-10 border-b border-slate-100 bg-slate-50/30">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex-1 space-y-2">
-              <h3 className="text-xl font-black text-slate-900 tracking-tight">Consolidated Result Ledger</h3>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Terminal Session v2024.1</p>
+      <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white">
+        <div className="p-4 border-b border-slate-50 bg-slate-50/20">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex-1 space-y-0.5">
+              <h3 className="text-[12px] font-black text-slate-900 tracking-tight leading-none">Result Ledger</h3>
+              <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none">Terminal Session</p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <div className="relative group">
-                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
-                <Input placeholder="Search student ID or name..." className="pl-12 h-14 rounded-2xl border-none bg-slate-100 focus:bg-white focus:ring-2 focus:ring-indigo-100 w-64 font-bold text-xs" />
+                <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-slate-900 transition-colors" />
+                <Input placeholder="Search scholar..." className="pl-9 h-8 rounded-lg border-none bg-slate-100 focus:bg-white focus:ring-1 focus:ring-slate-100 w-48 font-bold text-[9px]" />
               </div>
               <Select defaultValue="midterm">
-                <SelectTrigger className="h-14 w-48 rounded-2xl border-none bg-slate-100 font-bold text-xs">
+                <SelectTrigger className="h-8 w-32 rounded-lg border-none bg-slate-100 font-black text-[9px] uppercase tracking-widest">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="rounded-2xl border-none shadow-2xl">
-                  <SelectItem value="midterm" className="rounded-xl">Mid-Term v2024</SelectItem>
-                  <SelectItem value="final" className="rounded-xl">Final Exam v2023</SelectItem>
+                <SelectContent className="rounded-xl border-none shadow-xl">
+                  <SelectItem value="midterm" className="text-[9px] font-black uppercase tracking-widest">Mid-Term</SelectItem>
+                  <SelectItem value="final" className="text-[9px] font-black uppercase tracking-widest">Final Exam</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -3257,37 +3342,37 @@ function ExamsView({ students }: { students: Student[] }) {
         </div>
         
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          <table className="w-full text-xs text-left">
             <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest">Scholar Profile</th>
-                <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest">Academic Discipline</th>
-                <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-center">Score Delta</th>
-                <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-center">Final Grade</th>
-                <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-right">Status</th>
+              <tr className="bg-slate-50/50 border-b border-slate-50">
+                <th className="px-6 py-3 font-black uppercase text-[8px] text-slate-400 tracking-widest">Scholar</th>
+                <th className="px-6 py-3 font-black uppercase text-[8px] text-slate-400 tracking-widest">Discipline</th>
+                <th className="px-6 py-3 font-black uppercase text-[8px] text-slate-400 tracking-widest text-center">Score</th>
+                <th className="px-6 py-3 font-black uppercase text-[8px] text-slate-400 tracking-widest text-center">Grade</th>
+                <th className="px-6 py-3 font-black uppercase text-[8px] text-slate-400 tracking-widest text-right">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100/60">
+            <tbody className="divide-y divide-slate-100/60 transition-all">
               {[
                 { name: 'Ali Khan', subject: 'Mathematics', score: '85/100', grade: 'A', status: 'Pass' },
                 { name: 'Sara Ahmed', subject: 'Mathematics', score: '92/100', grade: 'A+', status: 'Pass' }
               ].map((res, i) => (
-                <tr key={i} className="hover:bg-slate-50/50 transition-all duration-300 group">
-                  <td className="px-10 py-8">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-black text-xs text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all transform group-hover:rotate-6">
+                <tr key={i} className="hover:bg-slate-50/20 transition-all group">
+                  <td className="px-6 py-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-[9px] text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-all transform group-hover:rotate-6">
                         {res.name.charAt(0)}
                       </div>
-                      <span className="font-black text-slate-900">{res.name}</span>
+                      <span className="font-black text-slate-900 text-[11px] uppercase tracking-tight">{res.name}</span>
                     </div>
                   </td>
-                  <td className="px-10 py-8">
-                    <Badge variant="outline" className="border-slate-200 text-slate-500 font-black text-[9px] uppercase tracking-widest">{res.subject}</Badge>
+                  <td className="px-6 py-2.5">
+                    <Badge variant="outline" className="border-slate-100 text-slate-400 font-black text-[8px] uppercase tracking-widest px-2 py-0.5 rounded-md">{res.subject}</Badge>
                   </td>
-                  <td className="px-10 py-8 text-center font-bold text-slate-600">{res.score}</td>
-                  <td className="px-10 py-8 text-center font-black text-xl text-indigo-600">{res.grade}</td>
-                  <td className="px-10 py-8 text-right">
-                    <Badge className="bg-emerald-50 text-emerald-600 border-none px-4 py-1.5 rounded-full font-black text-[9px] uppercase tracking-widest shadow-sm">
+                  <td className="px-6 py-2.5 text-center font-bold text-slate-600 text-[11px] tabular-nums">{res.score}</td>
+                  <td className="px-6 py-2.5 text-center font-black text-base text-indigo-600 tracking-tighter">{res.grade}</td>
+                  <td className="px-6 py-2.5 text-right">
+                    <Badge className="bg-emerald-50 text-emerald-600 border-none px-2 py-0.5 rounded-md font-black text-[8px] uppercase tracking-widest shadow-sm">
                       {res.status}
                     </Badge>
                   </td>
@@ -3328,42 +3413,42 @@ function CashbookView({
 
   return (
     <div className="space-y-10 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-slate-200/60 no-print">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-200/60 no-print">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Daily Cash Treasury</h2>
-          <p className="text-slate-500 font-bold mt-2 uppercase tracking-[0.2em] text-[10px]">Real-time Fiscal Flow Monitoring</p>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Daily Cash Treasury</h2>
+          <p className="text-slate-500 font-bold mt-1 uppercase tracking-[0.2em] text-[9px]">Real-time Fiscal Monitoring</p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 bg-slate-100 p-2 rounded-2xl">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-2">Log Date</Label>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl">
+            <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-2">Session Date</Label>
             <Input 
               type="date" 
               value={selectedDate} 
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-10 w-44 rounded-xl border-none font-bold bg-white shadow-sm"
+              className="h-9 w-36 rounded-lg border-none font-bold bg-white shadow-sm text-xs"
             />
           </div>
-          <Button variant="outline" onClick={() => window.print()} className="h-14 px-8 rounded-2xl text-[11px] font-black uppercase tracking-widest border-slate-200 hover:bg-slate-50 text-slate-600 transition-all shadow-sm active:scale-95">
-            <Printer size={18} className="mr-3 opacity-60" /> Day Sheet Print
+          <Button variant="outline" onClick={() => window.print()} className="h-11 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest border-slate-200 hover:bg-slate-50 text-slate-600 transition-all shadow-sm active:scale-95">
+            <Printer size={16} className="mr-2 opacity-60" /> Print
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
           { label: 'Inward Liquidity', value: totalIn, icon: ArrowDownRight, color: 'text-emerald-500', bg: 'bg-emerald-50/50' },
           { label: 'Outward Disbursement', value: totalOut, icon: ArrowUpLeft, color: 'text-rose-500', bg: 'bg-rose-50/50' },
           { label: 'Terminal Balance', value: netCash, icon: Wallet, color: netCash >= 0 ? 'text-indigo-600' : 'text-rose-600', bg: netCash >= 0 ? 'bg-indigo-50/50' : 'bg-rose-50/50' },
         ].map((stat, i) => (
-          <Card key={i} className={cn("border-none shadow-sm shadow-slate-200/50 rounded-[2.5rem] p-8 group hover:shadow-xl transition-all duration-500", stat.bg)}>
-            <div className="flex justify-between items-start mb-6">
-              <div className={cn("p-4 rounded-2xl bg-white shadow-sm transition-transform group-hover:scale-110", stat.color)}>
-                <stat.icon size={24} />
+          <Card key={i} className={cn("border-none shadow-sm rounded-2xl p-6 group hover:shadow-xl transition-all duration-500", stat.bg)}>
+            <div className="flex justify-between items-start mb-4">
+              <div className={cn("p-3 rounded-xl bg-white shadow-sm transition-transform group-hover:scale-110", stat.color)}>
+                <stat.icon size={20} />
               </div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
             </div>
-            <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-2">PKR {Math.abs(stat.value).toLocaleString()}</h3>
-            <p className={cn("text-[9px] font-black uppercase tracking-widest", stat.value >= 0 ? "text-emerald-500" : "text-rose-500")}>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1.5">PKR {Math.abs(stat.value).toLocaleString()}</h3>
+            <p className={cn("text-[8px] font-black uppercase tracking-widest", stat.value >= 0 ? "text-emerald-500" : "text-rose-500")}>
               {stat.value >= 0 ? "Favorable Margin" : "Negative Delta"}
             </p>
           </Card>
@@ -3639,42 +3724,40 @@ function FinanceView({
   };
 
   return (
-    <div className="space-y-10 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-slate-200/60 no-print">
+    <div className="space-y-6 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200/60 no-print">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Financial Oversight</h2>
-          <p className="text-slate-500 font-bold mt-2 uppercase tracking-[0.2em] text-[10px]">Fiscal Year {new Date().getFullYear()} • Treasury Division</p>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Cashbook</h2>
+          <p className="text-slate-500 font-bold mt-1 uppercase tracking-[0.15em] text-[8px]">Fiscal Year {new Date().getFullYear()} • Registry</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <Button 
             variant="outline" 
             onClick={printBalanceSheet} 
-            className="h-14 px-8 rounded-2xl text-[11px] font-black uppercase tracking-widest border-slate-200 hover:bg-slate-50 text-slate-600 transition-all shadow-sm active:scale-95"
+            className="h-9 px-5 rounded-xl text-[9px] font-black uppercase tracking-widest border-slate-200 hover:bg-slate-50 text-slate-600 shadow-sm active:scale-95"
           >
-            <PieChart size={18} className="mr-3 opacity-60" /> Monthly Report
+            <PieChart size={14} className="mr-2" /> Report
           </Button>
           <Dialog open={openAdd} onOpenChange={setOpenAdd}>
             <DialogTrigger asChild>
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white h-14 px-10 rounded-[1.2rem] font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl shadow-emerald-600/25 transition-all hover:scale-105 active:scale-95">
-                <PlusCircle size={20} className="mr-3" /> Record Transaction
+              <Button className="bg-slate-900 hover:bg-slate-800 text-white h-9 px-5 rounded-xl font-black uppercase tracking-widest text-[9px] shadow-lg shadow-slate-900/20 transition-all active:scale-95">
+                <Plus size={14} className="mr-2" /> Log Entry
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl">
-              <div className="bg-slate-950 p-10 text-white relative overflow-hidden">
-                <div className="relative z-10">
-                  <DialogTitle className="text-3xl font-black tracking-tight mb-2">Transaction Entry</DialogTitle>
-                  <DialogDescription className="font-bold text-slate-500 uppercase tracking-widest text-[10px]">Financial Integrity System Protocol</DialogDescription>
-                </div>
-                <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/20 rounded-full blur-[80px] -mr-24 -mt-24" />
+            <DialogContent className="sm:max-w-[400px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
+              <div className="bg-slate-900 p-6 text-white text-center">
+                <DialogTitle className="text-lg font-black tracking-tight mb-1">Fiscal Entry</DialogTitle>
+                <DialogDescription className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Registry Protocol</DialogDescription>
               </div>
-              <form onSubmit={handleSubmit} className="p-10 bg-white space-y-8">
-                <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-2">
+              <form onSubmit={handleSubmit} className="p-6 bg-white space-y-4">
+                <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
                   <Button 
                     type="button"
                     onClick={() => setFormData({...formData, type: 'income', category: incomeCategories[0]})}
+                    role="tab"
                     className={cn(
-                      "flex-1 h-12 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all",
-                      formData.type === 'income' ? "bg-white text-emerald-600 shadow-sm" : "bg-transparent text-slate-400 hover:text-slate-600"
+                      "flex-1 h-9 rounded-lg font-black uppercase tracking-widest text-[9px] transition-all",
+                      formData.type === 'income' ? "bg-white text-emerald-600 shadow-sm" : "bg-transparent text-slate-400 hover:text-slate-600 border-none hover:bg-transparent"
                     )}
                   >
                     Income
@@ -3682,59 +3765,61 @@ function FinanceView({
                   <Button 
                     type="button"
                     onClick={() => setFormData({...formData, type: 'expense', category: expenseCategories[0]})}
+                    role="tab"
                     className={cn(
-                      "flex-1 h-12 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all",
-                      formData.type === 'expense' ? "bg-white text-rose-500 shadow-sm" : "bg-transparent text-slate-400 hover:text-slate-600"
+                      "flex-1 h-9 rounded-lg font-black uppercase tracking-widest text-[9px] transition-all",
+                      formData.type === 'expense' ? "bg-white text-rose-500 shadow-sm" : "bg-transparent text-slate-400 hover:text-slate-600 border-none hover:bg-transparent"
                     )}
                   >
                     Expense
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Category</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Category</Label>
                     <Select 
                       value={formData.category} 
                       onValueChange={(val: any) => setFormData({...formData, category: val})}
                     >
-                      <SelectTrigger className="h-14 rounded-2xl bg-slate-50 border-transparent font-bold">
+                      <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-transparent font-bold text-[10px]">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-2xl">
+                      <SelectContent className="rounded-xl">
                         {(formData.type === 'income' ? incomeCategories : expenseCategories).map(cat => (
-                          <SelectItem key={cat} value={cat} className="rounded-xl">{cat}</SelectItem>
+                          <SelectItem key={cat} value={cat} className="text-[10px] font-bold">{cat}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Amount (PKR)</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Value (Rs.)</Label>
                     <Input 
                       type="number" 
                       value={formData.amount} 
                       onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                      className="h-14 rounded-2xl bg-slate-50 border-transparent font-black text-lg focus:bg-white"
+                      className="h-10 rounded-xl bg-slate-50 border-transparent font-bold text-xs focus:bg-white"
+                      placeholder="0.00"
                       required 
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Description</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Information / Memo</Label>
                   <Input 
                     value={formData.description} 
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    placeholder="Brief details of the transaction..."
-                    className="h-14 rounded-2xl bg-slate-50 border-transparent font-bold"
+                    placeholder="Brief details..."
+                    className="h-10 rounded-xl bg-slate-50 border-transparent font-bold text-xs"
                   />
                 </div>
 
                 <Button type="submit" className={cn(
-                  "w-full h-16 text-white font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl text-xs transition-all",
-                  formData.type === 'income' ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20" : "bg-rose-600 hover:bg-rose-700 shadow-rose-500/20"
+                  "w-full h-10 text-white font-black uppercase tracking-widest rounded-xl shadow-lg shadow-slate-900/10 text-[9px] transition-all active:scale-95",
+                  formData.type === 'income' ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
                 )}>
-                  Finalize Record
+                  Submit Record
                 </Button>
               </form>
             </DialogContent>
@@ -3742,62 +3827,60 @@ function FinanceView({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: 'Fiscal Revenue', value: totalIncome, icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50/50', border: 'border-emerald-100' },
-          { label: 'Total Expenditure', value: totalExpense, icon: TrendingDown, color: 'text-rose-500', bg: 'bg-rose-50/50', border: 'border-rose-100' },
-          { label: 'Net Liquidity', value: netProfit, icon: Wallet, color: netProfit >= 0 ? 'text-indigo-600' : 'text-rose-600', bg: netProfit >= 0 ? 'bg-indigo-50/50' : 'bg-rose-50/50', border: netProfit >= 0 ? 'border-indigo-100' : 'border-rose-100' },
+          { label: 'Revenue', value: totalIncome, icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50/50', border: 'border-emerald-100' },
+          { label: 'Expenses', value: totalExpense, icon: TrendingDown, color: 'text-rose-500', bg: 'bg-rose-50/50', border: 'border-rose-100' },
+          { label: 'Liquidity', value: netProfit, icon: Wallet, color: netProfit >= 0 ? 'text-indigo-600' : 'text-rose-600', bg: netProfit >= 0 ? 'bg-indigo-50/50' : 'bg-rose-50/50', border: netProfit >= 0 ? 'border-indigo-100' : 'border-rose-100' },
         ].map((stat, i) => (
-          <Card key={i} className={`border-none shadow-sm shadow-slate-200/50 rounded-[2.5rem] p-8 ${stat.bg} group hover:shadow-xl transition-all duration-500`}>
-            <div className="flex justify-between items-start mb-6">
-              <div className={`p-4 rounded-2xl bg-white shadow-sm ${stat.color} group-hover:scale-110 transition-transform`}>
-                <stat.icon size={24} />
+          <Card key={i} className={`border-none shadow-sm rounded-2xl p-6 ${stat.bg} group hover:shadow-md transition-all`}>
+            <div className="flex justify-between items-start mb-4">
+              <div className={`p-3 rounded-xl bg-white shadow-sm ${stat.color}`}>
+                <stat.icon size={18} />
               </div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
             </div>
-            <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-2">PKR {Math.abs(stat.value).toLocaleString()}</h3>
-            <div className="flex items-center gap-2">
-              <span className={`text-[10px] font-black uppercase tracking-tighter ${stat.value >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                {stat.value >= 0 ? 'Positive Balance' : 'Capital Deficit'}
-              </span>
-            </div>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">Rs. {Math.abs(stat.value).toLocaleString()}</h3>
+            <p className={`text-[8px] font-black uppercase tracking-widest ${stat.value >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+              {stat.value >= 0 ? 'Positive' : 'Deficit'}
+            </p>
           </Card>
         ))}
       </div>
 
-      <div className="flex bg-slate-100 p-1.5 rounded-[1.2rem] w-fit no-print">
+      <div className="flex bg-slate-100 p-1 rounded-xl w-fit no-print font-bold text-[9px] uppercase tracking-widest">
         <Button 
           onClick={() => setActiveTab('transactions')} 
           variant="ghost" 
           className={cn(
-            "h-12 px-8 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all",
+            "h-9 px-6 rounded-lg transition-all",
             activeTab === 'transactions' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
           )}
         >
-          General Ledger
+          Ledger
         </Button>
         <Button 
           onClick={() => setActiveTab('balancesheet')} 
           variant="ghost" 
           className={cn(
-            "h-12 px-8 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all",
+            "h-9 px-6 rounded-lg transition-all",
             activeTab === 'balancesheet' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
           )}
         >
-          Analytical Breakdown
+          Analysis
         </Button>
       </div>
 
       {activeTab === 'transactions' ? (
-        <Card className="border-none shadow-sm shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
-          <div className="p-8 border-b border-slate-100 flex gap-4 no-print">
+        <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white">
+          <div className="p-6 border-b border-slate-50 flex gap-4 no-print bg-slate-50/20">
             <div className="relative flex-1 group">
-              <Search size={20} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
               <Input 
-                placeholder="Search ledger by description, category, or student profile..." 
+                placeholder="Search history..." 
                 value={financeSearch}
                 onChange={(e) => setFinanceSearch(e.target.value)}
-                className="pl-14 h-16 rounded-[1.5rem] border-none bg-slate-50 text-base font-medium focus:bg-white focus:ring-emerald-50 placeholder:text-slate-400"
+                className="pl-11 h-10 rounded-xl border-none bg-white shadow-sm font-bold text-xs focus:ring-1 focus:ring-indigo-100 transition-all"
               />
             </div>
           </div>
@@ -3805,60 +3888,59 @@ function FinanceView({
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest">Temporal Log</th>
-                  <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest">Entry Class</th>
-                  <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest">Operational Detail</th>
-                  <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-center">Invoiced Value</th>
-                  <th className="px-10 py-6 font-black uppercase text-[10px] text-slate-400 tracking-widest text-right">Actions</th>
+                <tr className="bg-slate-50/50 border-b border-slate-50">
+                  <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest">Date</th>
+                  <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest">Classification</th>
+                  <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest">Detail</th>
+                  <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-center">Amount</th>
+                  <th className="px-6 py-4 font-black uppercase text-[9px] text-slate-400 tracking-widest text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100/60">
+              <tbody className="divide-y divide-slate-100/50 font-medium text-xs">
                 {filteredTransactions.map((t) => {
                   const student = t.studentId ? students.find(s => s.id === t.studentId) : null;
                   return (
-                    <tr key={t.id} className="hover:bg-slate-50/50 transition-all duration-300 group">
-                      <td className="px-10 py-8">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black transition-all transform group-hover:rotate-6 ${
-                            t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'
-                          }`}>
-                            <Calendar size={18} />
-                          </div>
+                    <tr key={t.id} className="hover:bg-slate-50/20 transition-all group">
+                      <td className="px-6 py-3.5">
+                        <div className="flex items-center gap-3">
                           <div>
-                            <p className="font-black text-slate-900 leading-none mb-1">{new Date(t.date).toLocaleDateString()}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.month}, {t.year}</p>
+                            <p className="font-black text-slate-900 leading-none mb-0.5">{new Date(t.date).toLocaleDateString()}</p>
+                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t.month}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-10 py-8">
-                        <Badge className={`border-none px-4 py-1.5 rounded-full font-black text-[9px] uppercase tracking-widest ${
+                      <td className="px-6 py-3.5">
+                        <Badge className={cn(
+                          "px-3 py-1 rounded-full font-black text-[8px] uppercase tracking-widest border-none",
                           t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'
-                        }`}>
+                        )}>
                           {t.category}
                         </Badge>
                       </td>
-                      <td className="px-10 py-8">
+                      <td className="px-6 py-3.5">
                         <div>
-                          <p className="font-bold text-slate-700 leading-tight mb-1">{t.description}</p>
+                          <p className="font-black text-slate-900 leading-none mb-0.5 uppercase tracking-tight">{t.description}</p>
                           {student && (
-                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Rel: {student.name}</p>
+                            <p className="text-[8px] font-bold text-indigo-500 uppercase tracking-widest italic">{student.name}</p>
                           )}
                         </div>
                       </td>
-                      <td className="px-10 py-8 text-center">
-                        <span className={`font-black text-base ${t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {t.type === 'income' ? '+' : '-'} {t.amount.toLocaleString()}
+                      <td className="px-6 py-3.5 text-center">
+                        <span className={cn(
+                          "font-black tracking-tight",
+                          t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'
+                        )}>
+                          {t.type === 'income' ? '+' : '-'} {Number(t.amount).toLocaleString()}
                         </span>
                       </td>
-                      <td className="px-10 py-8 text-right">
+                      <td className="px-6 py-3.5 text-right">
                         <Button 
                           variant="ghost" 
                           size="icon" 
                           onClick={() => onDeleteTransaction(t.id)}
-                          className="h-10 w-10 rounded-xl text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100"
+                          className="h-7 w-7 rounded-lg text-slate-300 hover:text-rose-500 transition-all"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={12} />
                         </Button>
                       </td>
                     </tr>
@@ -4129,26 +4211,26 @@ function InventoryView({
   return (
     <div className="space-y-12 pb-20">
       {/* Dynamic Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-10 border-b border-slate-200/60 no-print">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200/60 no-print">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Commerce Vault</h2>
-          <p className="text-slate-500 font-bold mt-2 uppercase tracking-[0.2em] text-[10px]">Asset Inventory • Trade Analytics</p>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Inventory</h2>
+          <p className="text-slate-500 font-bold mt-1 uppercase tracking-[0.2em] text-[8px]">Resource & Asset Logistics</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 bg-slate-100 p-2 rounded-[1.5rem]">
+        <div className="flex flex-wrap items-center gap-2 bg-slate-100 p-1 rounded-xl">
           {[
-            { id: 'stock', label: 'Asset Stock' },
-            { id: 'purchase', label: 'Procurement' },
-            { id: 'sale', label: 'Disbursement' },
-            { id: 'history', label: 'Trade Ledger' },
-            { id: 'report', label: 'Profit Audit' },
-            { id: 'vendorledger', label: 'Vendor Matrix' },
+            { id: 'stock', label: 'Stock' },
+            { id: 'purchase', label: 'Purchase' },
+            { id: 'sale', label: 'Sale' },
+            { id: 'history', label: 'History' },
+            { id: 'report', label: 'Report' },
+            { id: 'vendorledger', label: 'Vendors' },
           ].map((tab) => (
             <Button 
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)} 
               variant="ghost" 
               className={cn(
-                "h-12 px-6 rounded-2xl font-black uppercase tracking-widest text-[9px] transition-all",
+                "h-9 px-4 rounded-lg font-black uppercase tracking-widest text-[9px] transition-all",
                 activeTab === tab.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
               )}
             >
@@ -4159,53 +4241,52 @@ function InventoryView({
       </div>
 
       {/* Modern Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card className="border-none shadow-sm shadow-slate-200/50 rounded-[2.5rem] bg-white group hover:shadow-xl transition-all duration-500">
-            <CardContent className="p-8">
-              <div className="flex items-center justify-between mb-6">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform">
-                  <ShoppingCart size={24} />
+          <Card className="border-none shadow-sm rounded-2xl bg-white group hover:shadow-md transition-all">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center transition-transform">
+                  <ShoppingCart size={18} />
                 </div>
-                <Badge className="bg-slate-50 text-slate-400 border-none px-3 py-1 rounded-full font-black text-[9px] uppercase tracking-widest">Gross Sales</Badge>
+                <Badge className="bg-slate-50 text-slate-400 border-none px-2 py-0.5 rounded-lg font-black text-[8px] uppercase tracking-widest">Sales</Badge>
               </div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Revenue Displacement</p>
-              <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none">PKR {saleTotal.toLocaleString()}</h3>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Revenue</p>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-none">PKR {saleTotal.toLocaleString()}</h3>
             </CardContent>
           </Card>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Card className="border-none shadow-sm shadow-slate-200/50 rounded-[2.5rem] bg-white group hover:shadow-xl transition-all duration-500">
-            <CardContent className="p-8">
-              <div className="flex items-center justify-between mb-6">
-                <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform">
-                  <Package size={24} />
+          <Card className="border-none shadow-sm rounded-2xl bg-white group hover:shadow-md transition-all">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center transition-transform">
+                  <Package size={18} />
                 </div>
-                <Badge className="bg-slate-50 text-slate-400 border-none px-3 py-1 rounded-full font-black text-[9px] uppercase tracking-widest">Procurement</Badge>
+                <Badge className="bg-slate-50 text-slate-400 border-none px-2 py-0.5 rounded-lg font-black text-[8px] uppercase tracking-widest">Procurement</Badge>
               </div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Acquisition Cost</p>
-              <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none">PKR {purchaseTotal.toLocaleString()}</h3>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Acquisition Cost</p>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-none">PKR {purchaseTotal.toLocaleString()}</h3>
             </CardContent>
           </Card>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
           <Card className={cn(
-            "border-none shadow-sm shadow-slate-200/50 rounded-[2.5rem] group hover:shadow-xl transition-all duration-500 relative overflow-hidden",
-            grossProfit >= 0 ? "bg-emerald-950 text-white" : "bg-rose-950 text-white"
+            "border-none shadow-sm rounded-2xl transition-all",
+            grossProfit >= 0 ? "bg-slate-900 text-white" : "bg-rose-900 text-white"
           )}>
-            <CardContent className="p-8 relative z-10">
-              <div className="flex items-center justify-between mb-6">
-                <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform">
-                  <BarChart3 size={24} className={grossProfit >= 0 ? "text-emerald-400" : "text-rose-400"} />
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                  <BarChart3 size={18} className={grossProfit >= 0 ? "text-emerald-400" : "text-rose-400"} />
                 </div>
-                <Badge className="bg-white/10 text-white/60 border-none px-3 py-1 rounded-full font-black text-[9px] uppercase tracking-widest italic font-mono">Net Yield</Badge>
+                <Badge className="bg-white/10 text-white/60 border-none px-2 py-0.5 rounded-lg font-black text-[8px] uppercase tracking-widest italic">Net Yield</Badge>
               </div>
-              <p className={cn("text-[10px] font-black uppercase tracking-widest mb-1", grossProfit >= 0 ? "text-emerald-400" : "text-rose-400")}>Operating Margin</p>
-              <h3 className="text-3xl font-black tracking-tight leading-none">PKR {grossProfit.toLocaleString()}</h3>
+              <p className={cn("text-[9px] font-black uppercase tracking-widest mb-1", grossProfit >= 0 ? "text-emerald-400" : "text-rose-400")}>Operating Margin</p>
+              <h3 className="text-2xl font-black tracking-tight leading-none">PKR {grossProfit.toLocaleString()}</h3>
             </CardContent>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16" />
           </Card>
         </motion.div>
       </div>
@@ -4215,30 +4296,30 @@ function InventoryView({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {inventory.map((item, i) => (
             <motion.div key={item.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}>
-              <Card className="border-none shadow-sm shadow-slate-200/50 rounded-[2.5rem] bg-white group hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500">
-                 <CardContent className="p-10 text-center">
-                    <div className="w-20 h-20 rounded-[1.5rem] bg-slate-50 flex items-center justify-center text-slate-300 font-black text-2xl group-hover:bg-indigo-600 group-hover:text-white transition-all transform group-hover:rotate-12 mx-auto mb-8 shadow-inner">
+              <Card className="border-none shadow-sm rounded-2xl bg-white group hover:shadow-md transition-all">
+                 <CardContent className="p-6 text-center">
+                    <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-300 font-black text-lg group-hover:bg-slate-900 group-hover:text-white transition-all mx-auto mb-4">
                        {item.name.charAt(0)}
                     </div>
-                    <h4 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-2 uppercase group-hover:text-indigo-600 transition-colors">{item.name}</h4>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8 italic">Inventory Phase: {item.category || 'Standard'}</p>
+                    <h4 className="text-sm font-black text-slate-900 tracking-tight leading-none mb-1 uppercase group-hover:text-slate-600 transition-colors">{item.name}</h4>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-6 italic">{item.category || 'Standard'}</p>
                     
-                    <div className="grid grid-cols-2 gap-4 mb-10">
-                       <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Stock Level</p>
+                    <div className="grid grid-cols-2 gap-2 mb-6">
+                       <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                          <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Stock</p>
                           <p className={cn(
-                            "text-xl font-black",
-                            item.stockQuantity <= item.minStockLevel ? "text-rose-600" : "text-slate-900"
-                          )}>{item.stockQuantity} <span className="text-[10px] uppercase">{item.unit}</span></p>
+                            "text-xs font-black",
+                            item.stockQuantity <= (item.minStockLevel || 0) ? "text-rose-600" : "text-slate-900"
+                          )}>{item.stockQuantity} <span className="text-[7px] uppercase">{item.unit}</span></p>
                        </div>
-                       <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Market Rate</p>
-                          <p className="text-xl font-black text-slate-900">Rs. {item.salePrice}</p>
+                       <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                          <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Price</p>
+                          <p className="text-xs font-black text-slate-900">Rs. {Number(item.salePrice).toLocaleString()}</p>
                        </div>
                     </div>
 
-                    <Button variant="outline" className="w-full h-14 rounded-2xl border-slate-200 text-slate-600 font-black uppercase tracking-widest text-[9px] hover:bg-slate-50 transition-all active:scale-95">
-                      Adjust Provisions
+                    <Button variant="outline" className="w-full h-8 rounded-lg border-slate-200 text-slate-500 font-bold uppercase tracking-widest text-[8px] hover:bg-slate-50">
+                      Details
                     </Button>
                  </CardContent>
               </Card>
@@ -4506,52 +4587,52 @@ function SessionManagementView({
 
   return (
     <div className="space-y-6">
-       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black tracking-tight">Session Management</h2>
-        <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 px-3 py-1 text-xs">
-          Current: {session}
+      <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div>
+          <h2 className="text-xl font-black text-slate-900 tracking-tight leading-none">Session Management</h2>
+          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Lifecycle control protocol</p>
+        </div>
+        <Badge className="bg-slate-900 text-white border-none px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg">
+          Active: {session}
         </Badge>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="border border-border shadow-none rounded-xl">
-          <CardHeader>
-            <CardTitle className="text-base font-bold">Update Current Session</CardTitle>
-            <CardDescription className="text-xs">Set the active academic session name (e.g., 2024-25).</CardDescription>
+        <Card className="border-none shadow-sm rounded-xl overflow-hidden bg-white">
+          <CardHeader className="p-5 border-b border-slate-50 bg-slate-50/20">
+            <CardTitle className="text-sm font-black text-slate-900 tracking-tight leading-none uppercase tracking-widest text-[10px]">Update active cycle</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-xs">Academic Session Name</Label>
+          <CardContent className="p-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">Session nomenclature</Label>
               <Input 
                 value={newSession} 
                 onChange={(e) => setNewSession(e.target.value)}
                 placeholder="e.g. 2024-25"
-                className="h-10 text-sm"
+                className="h-10 rounded-lg bg-slate-50 border-none font-bold text-xs"
               />
             </div>
             <Button 
               onClick={() => onUpdateSession(newSession)}
-              className="w-full bg-primary h-10 text-xs font-bold"
+              className="w-full bg-slate-900 hover:bg-slate-800 h-10 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95"
             >Update Session Info</Button>
           </CardContent>
         </Card>
 
-        <Card className="border border-border shadow-none rounded-xl bg-amber-50/30 border-amber-100">
-          <CardHeader>
-            <CardTitle className="text-base font-bold text-amber-800">Mass Student Promotion</CardTitle>
-            <CardDescription className="text-xs text-amber-600/80">Promote all students to their next level (e.g. 9th to 10th). Graduation class will be marked Alumnus.</CardDescription>
+        <Card className="border-none shadow-sm rounded-xl overflow-hidden bg-white">
+          <CardHeader className="p-5 border-b border-slate-50 bg-amber-50/30">
+            <CardTitle className="text-sm font-black text-amber-700 tracking-tight leading-none uppercase tracking-widest text-[10px]">Mass Promotion logic</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-3 bg-white border border-amber-200 rounded-lg space-y-2 text-[11px] text-amber-800">
-              <p><strong>Note:</strong> Ensure all final exams are marked before clicking.</p>
-              <p><strong>Sequence:</strong> PG → Nursery → KG → 1st ... → 10th → Alumnus</p>
+          <CardContent className="p-5 space-y-4">
+            <div className="p-3 bg-amber-50 rounded-lg border border-amber-100 text-[9px] font-bold text-amber-700 uppercase tracking-tight leading-relaxed">
+              <p>Sequence: PG → Nur → KG → 1st → ... → 10th → Alumnus</p>
             </div>
             <Button 
               onClick={handlePromote}
               disabled={isPromoting}
-              className="w-full bg-amber-600 hover:bg-amber-700 h-10 text-xs font-bold flex items-center gap-2"
+              className="w-full bg-amber-600 hover:bg-amber-700 h-10 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 text-white flex items-center justify-center gap-2"
             >
-              {isPromoting ? 'Promoting Students...' : <><RefreshCw size={14} /> Run Promotion Logic</>}
+              {isPromoting ? 'Running...' : <><RefreshCw size={12} /> Run Mass Promotion</>}
             </Button>
           </CardContent>
         </Card>
@@ -4578,112 +4659,110 @@ function BalanceSheetView({
   const cashInHand = netProfit + openingBalance;
 
   return (
-    <div className="space-y-8 no-print">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 no-print">
+      <div className="flex items-center justify-between pb-4 border-b border-slate-100">
         <div>
-          <h2 className="text-2xl font-black tracking-tight">Financial Balance Sheet</h2>
-          <p className="text-xs text-muted-foreground capitalize">Overall financial health and cash-in-hand summary</p>
+          <h2 className="text-xl font-black text-slate-900 tracking-tight leading-none uppercase tracking-widest text-[10px]">Financial Balance Sheet</h2>
+          <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest leading-none">Fiscal status and liquid asset summary</p>
         </div>
         <div className="flex gap-2">
-           <Button variant="outline" size="sm" onClick={() => window.print()} className="h-9 text-xs border-border">
-            <Printer size={14} className="mr-2" /> Print Summary
+           <Button variant="outline" size="sm" onClick={() => window.print()} className="h-8 px-4 rounded-lg text-[9px] font-black uppercase tracking-widest border-slate-200 hover:bg-slate-50 transition-all active:scale-95">
+            <Printer size={12} className="mr-2" /> Print Sheet
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-         <Card className="border-none shadow-sm bg-blue-600 text-white rounded-2xl p-6">
-           <div className="flex justify-between items-start mb-4">
-             <div className="p-2 bg-white/10 rounded-lg"><Calculator size={18} /></div>
+         <Card className="border-none shadow-sm bg-slate-900 text-white rounded-xl p-5 relative overflow-hidden group">
+           <div className="flex justify-between items-start mb-4 relative z-10">
+             <div className="p-2 bg-white/10 rounded-lg"><Calculator size={16} /></div>
              <Button 
               variant="ghost" 
               size="sm" 
               onClick={() => setEditOpening(!editOpening)}
-              className="text-[10px] h-6 px-2 bg-white/10 hover:bg-white/20 text-white border-none uppercase font-bold"
-             >Set Opening</Button>
+              className="text-[8px] h-6 px-3 bg-white/10 hover:bg-white/20 text-white border-none uppercase font-black tracking-widest leading-none"
+             >Adjust</Button>
            </div>
-           <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">Opening Balance</p>
-           <h3 className="text-2xl font-black">Rs.{openingBalance.toLocaleString()}</h3>
+           <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 relative z-10">Float (Opening)</p>
+           <h3 className="text-2xl font-black tracking-tight leading-none relative z-10">Rs. {openingBalance.toLocaleString()}</h3>
            {editOpening && (
-             <div className="mt-3 flex gap-2">
+             <div className="mt-4 flex gap-2 relative z-10">
                <Input 
                 value={openingVal} 
                 onChange={(e) => setOpeningVal(e.target.value)}
-                className="h-8 text-xs bg-white text-black border-none"
+                className="h-8 text-[10px] bg-white text-slate-900 border-none font-bold rounded-lg"
                 placeholder="0"
+                autoFocus
                />
                <Button 
                 onClick={() => {
                   onUpdateOpeningBalance(Number(openingVal));
                   setEditOpening(false);
                 }}
-                className="h-8 text-[10px] bg-emerald-500 hover:bg-emerald-600 border-none px-2 font-bold"
+                className="h-8 text-[9px] font-black bg-emerald-500 hover:bg-emerald-600 border-none px-3 text-white uppercase tracking-widest rounded-lg"
                >Save</Button>
              </div>
            )}
+           <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-3xl -mr-12 -mt-12 group-hover:scale-110 transition-transform" />
          </Card>
 
-         <Card className="border border-border shadow-none rounded-2xl p-6">
-           <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg w-fit mb-4"><ArrowUpCircle size={18} /></div>
-           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Income</p>
-           <h3 className="text-2xl font-black text-foreground">Rs.{totalIncome.toLocaleString()}</h3>
-         </Card>
-
-         <Card className="border border-border shadow-none rounded-2xl p-6">
-           <div className="p-2 bg-red-100 text-red-600 rounded-lg w-fit mb-4"><ArrowDownCircle size={18} /></div>
-           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Expense</p>
-           <h3 className="text-2xl font-black text-foreground">Rs.{totalExpense.toLocaleString()}</h3>
-         </Card>
-
-         <Card className="border-none shadow-sm bg-accent text-white rounded-2xl p-6">
-           <div className="p-2 bg-white/10 rounded-lg w-fit mb-4"><Wallet size={18} /></div>
-           <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">Cash in Hand (Net)</p>
-           <h3 className="text-2xl font-black">Rs.{cashInHand.toLocaleString()}</h3>
-         </Card>
+         {[
+           { label: 'Revenue', value: totalIncome, icon: ArrowUpCircle, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+           { label: 'Expenses', value: totalExpense, icon: ArrowDownCircle, color: 'text-rose-500', bg: 'bg-rose-50' },
+           { label: 'Cash in Hand', value: cashInHand, icon: Wallet, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+         ].map((stat, i) => (
+           <Card key={i} className="border-none shadow-sm rounded-xl p-5 bg-white group hover:shadow-md transition-all">
+             <div className={cn("p-2 rounded-lg w-fit mb-4", stat.bg, stat.color)}>
+               <stat.icon size={16} />
+             </div>
+             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
+             <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Rs. {stat.value.toLocaleString()}</h3>
+           </Card>
+         ))}
       </div>
 
-      <Card className="border border-border shadow-none rounded-2xl overflow-hidden">
-        <CardHeader className="bg-muted/30 border-b">
-           <CardTitle className="text-sm font-bold flex items-center justify-between">
-            Financial Ledger Breakdown
-            <Badge variant="outline" className={cashInHand > 0 ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}>
+      <Card className="border-none shadow-sm rounded-xl overflow-hidden bg-white mt-6">
+        <CardHeader className="bg-slate-50 border-b border-slate-100 p-5">
+           <CardTitle className="text-xs font-black flex items-center justify-between uppercase tracking-widest text-slate-800">
+            Institutional Ledger Summary
+            <Badge className={cn("px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border-none text-white", cashInHand > 0 ? "bg-emerald-600" : "bg-rose-600")}>
               {cashInHand > 0 ? 'Surplus' : 'Deficit'}
             </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-background border-b text-[11px] font-bold uppercase text-muted-foreground">
+        <CardContent className="p-0 overflow-x-auto">
+          <table className="w-full text-xs text-left">
+            <thead className="bg-slate-50/50 border-b border-slate-100 text-[9px] font-black uppercase text-slate-400 tracking-widest">
               <tr>
-                <th className="px-6 py-4">Item Description</th>
-                <th className="px-6 py-4 text-emerald-600">Credit (In)</th>
-                <th className="px-6 py-4 text-red-600">Debit (Out)</th>
-                <th className="px-6 py-4 text-right">Running Total</th>
+                <th className="px-6 py-4">Item Catalog</th>
+                <th className="px-6 py-4 text-emerald-600 text-center">Inflow</th>
+                <th className="px-6 py-4 text-rose-600 text-center">Outflow</th>
+                <th className="px-6 py-4 text-right">Aggregate</th>
               </tr>
             </thead>
-            <tbody>
-              <tr className="border-b bg-muted/10 font-medium">
-                <td className="px-6 py-4">Session Opening Balance (Previous Cash)</td>
-                <td className="px-6 py-4 text-emerald-600">Rs.{openingBalance.toLocaleString()}</td>
-                <td className="px-6 py-4">-</td>
-                <td className="px-6 py-4 text-right font-bold">Rs.{openingBalance.toLocaleString()}</td>
+            <tbody className="divide-y divide-slate-100 font-bold text-slate-600">
+              <tr className="bg-slate-50/20">
+                <td className="px-6 py-3 text-slate-400 italic">Historical Opening Balance</td>
+                <td className="px-6 py-3 text-emerald-600 text-center">Rs. {openingBalance.toLocaleString()}</td>
+                <td className="px-6 py-3 text-center">-</td>
+                <td className="px-6 py-3 text-right text-slate-900">Rs. {openingBalance.toLocaleString()}</td>
               </tr>
-              <tr className="border-b">
-                <td className="px-6 py-4">Current Session Income (Fees, Sales, etc.)</td>
-                <td className="px-6 py-4 text-emerald-600">Rs.{totalIncome.toLocaleString()}</td>
-                <td className="px-6 py-4">-</td>
-                <td className="px-6 py-4 text-right">Rs.{(openingBalance + totalIncome).toLocaleString()}</td>
+              <tr className="hover:bg-slate-50/10">
+                <td className="px-6 py-3">Invoiced Operating Revenue</td>
+                <td className="px-6 py-3 text-emerald-600 text-center">Rs. {totalIncome.toLocaleString()}</td>
+                <td className="px-6 py-3 text-center">-</td>
+                <td className="px-6 py-3 text-right">Rs. {(openingBalance + totalIncome).toLocaleString()}</td>
               </tr>
-              <tr className="border-b">
-                <td className="px-6 py-4">Current Session Expenses (Salaries, Utils, etc.)</td>
-                <td className="px-6 py-4">-</td>
-                <td className="px-6 py-4 text-red-600">Rs.{totalExpense.toLocaleString()}</td>
-                <td className="px-6 py-4 text-right">Rs.{cashInHand.toLocaleString()}</td>
+              <tr className="hover:bg-slate-50/10">
+                <td className="px-6 py-3">Incurred Operational Expenditure</td>
+                <td className="px-6 py-3 text-center">-</td>
+                <td className="px-6 py-3 text-rose-600 text-center">Rs. {totalExpense.toLocaleString()}</td>
+                <td className="px-6 py-3 text-right">Rs. {cashInHand.toLocaleString()}</td>
               </tr>
-              <tr className="bg-accent text-white font-black text-base">
-                <td className="px-6 py-5">CURRENT CASH STATUS (IN-HAND)</td>
+              <tr className="bg-slate-900 text-white font-black">
+                <td className="px-6 py-4 uppercase tracking-widest text-[10px]">Net Liquid Assets</td>
                 <td colSpan={2}></td>
-                <td className="px-6 py-5 text-right">Rs.{cashInHand.toLocaleString()}</td>
+                <td className="px-6 py-4 text-right text-lg">Rs. {cashInHand.toLocaleString()}</td>
               </tr>
             </tbody>
           </table>
@@ -4695,47 +4774,47 @@ function BalanceSheetView({
 
 function AnnouncementsView() {
   return (
-    <div className="space-y-10 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-slate-200/60 no-print">
+    <div className="space-y-6 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200/60 no-print">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Bureau of Communication</h2>
-          <p className="text-slate-500 font-bold mt-2 uppercase tracking-[0.2em] text-[10px]">Institutional Announcements & Directives</p>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Announcements</h2>
+          <p className="text-slate-500 font-bold mt-1 uppercase tracking-[0.15em] text-[8px]">Institutional Directives & Communication</p>
         </div>
-        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white h-14 px-10 rounded-[1.2rem] font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl shadow-indigo-600/25 transition-all hover:scale-105 active:scale-95">
-          <BellPlus size={20} className="mr-3" /> Broadcast Directive
+        <Button className="bg-slate-900 hover:bg-slate-800 text-white h-9 px-6 rounded-xl font-black uppercase tracking-widest text-[9px] shadow-lg shadow-slate-900/20 transition-all active:scale-95">
+          <BellPlus size={14} className="mr-2" /> Broadcast
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[
-          { id: '1', title: 'Session Re-orientation', date: '25 OCT 2024', content: 'In accordance with the new academic guidelines, the orientation session for the upcoming semester has been rescheduled to provide optimized student integration.', targetRole: 'ALL PERS.' },
-          { id: '2', title: 'Digital Infrastructure Update', date: '20 OCT 2024', content: 'System maintenance scheduled for Sunday to enhance cloud database performance across the enterprise management portal.', targetRole: 'FACULTY' },
-          { id: '3', title: 'Annual Fiscal Audit', date: '15 OCT 2024', content: 'Departments are requested to finalize ledger records for the internal treasury audit scheduled for next month.', targetRole: 'ADMIN' },
+          { id: '1', title: 'Session Re-orientation', date: '25 OCT 2024', content: 'Academic orientation has been rescheduled for optimized student integration.', targetRole: 'ALL' },
+          { id: '2', title: 'System Maintenance', date: '20 OCT 2024', content: 'Infrastructure updates scheduled for enhancing cloud database performance.', targetRole: 'FACULTY' },
+          { id: '3', title: 'Annual Fiscal Audit', date: '15 OCT 2024', content: 'Departments must finalize ledger records for the internal treasury audit.', targetRole: 'ADMIN' },
         ].map((ann, i) => (
           <motion.div
             key={ann.id}
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: i * 0.1 }}
           >
-            <Card className="border-none shadow-sm shadow-slate-200/50 rounded-[2.5rem] bg-white overflow-hidden group hover:shadow-xl transition-all duration-500 border-l-[6px] border-indigo-600/20 hover:border-indigo-600">
-              <CardContent className="p-10">
-                <div className="flex justify-between items-start mb-8">
-                  <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center transition-transform group-hover:rotate-6">
-                    <Send size={20} />
+            <Card className="border-none shadow-sm rounded-2xl bg-white overflow-hidden group hover:shadow-md transition-all border-l-4 border-indigo-600/30 hover:border-indigo-600">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-6">
+                    <Send size={16} />
                   </div>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{ann.date}</span>
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{ann.date}</span>
                 </div>
-                <h4 className="text-xl font-black text-slate-900 tracking-tight mb-4 group-hover:text-indigo-600 transition-colors">{ann.title}</h4>
-                <p className="text-slate-500 text-xs font-bold leading-relaxed mb-8 opacity-80 line-clamp-3">{ann.content}</p>
-                <div className="flex justify-between items-center pt-8 border-t border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck size={14} className="text-indigo-600" />
-                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{ann.targetRole}</span>
+                <h4 className="text-lg font-black text-slate-900 tracking-tight mb-2 group-hover:text-indigo-600 transition-colors uppercase">{ann.title}</h4>
+                <p className="text-slate-500 text-[11px] font-medium leading-relaxed mb-6 line-clamp-2">{ann.content}</p>
+                <div className="flex justify-between items-center pt-4 border-t border-slate-50">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck size={12} className="text-indigo-600" />
+                    <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">{ann.targetRole}</span>
                   </div>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-300 hover:text-indigo-600 hover:bg-slate-50 rounded-xl"><Edit3 size={16} /></Button>
-                    <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl"><Trash2 size={16} /></Button>
+                  <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-indigo-600 hover:bg-slate-50"><Edit3 size={12} /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-rose-500 hover:bg-rose-50"><Trash2 size={12} /></Button>
                   </div>
                 </div>
               </CardContent>

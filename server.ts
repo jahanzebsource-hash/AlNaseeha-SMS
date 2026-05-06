@@ -135,16 +135,16 @@ async function startServer() {
     const db = getPool();
     if (!db) return res.status(503).json({ error: "Database not configured" });
 
-    const { id, name, email, rollNumber, grade, section, parentName, parentContact, address, dateOfBirth, monthlyFee, arrears } = req.body;
+    const { id, name, email, rollNumber, grade, section, gender, parentName, parentContact, address, dateOfBirth, monthlyFee, arrears } = req.body;
     try {
       const finalId = id || Math.random().toString(36).substring(2, 11);
       const result = await db.query(
-        `INSERT INTO students (id, name, email, roll_number, grade, section, parent_name, parent_contact, address, date_of_birth, monthly_fee, arrears) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) 
+        `INSERT INTO students (id, name, email, roll_number, grade, section, gender, parent_name, parent_contact, address, date_of_birth, monthly_fee, arrears) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) 
          ON CONFLICT (id) DO UPDATE SET 
-         name=$2, email=$3, roll_number=$4, grade=$5, section=$6, parent_name=$7, parent_contact=$8, address=$9, date_of_birth=$10, monthly_fee=$11, arrears=$12
+         name=$2, email=$3, roll_number=$4, grade=$5, section=$6, gender=$7, parent_name=$8, parent_contact=$9, address=$10, date_of_birth=$11, monthly_fee=$12, arrears=$13
          RETURNING *`,
-        [finalId, name, email, rollNumber, grade, section, parentName, parentContact, address, dateOfBirth, monthlyFee, arrears || 0]
+        [finalId, name, email, rollNumber, grade, section, gender, parentName, parentContact, address, dateOfBirth, monthlyFee, arrears || 0]
       );
       res.status(201).json(toCamelCase(result.rows)[0]);
     } catch (err: any) {
