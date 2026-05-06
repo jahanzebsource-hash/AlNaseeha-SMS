@@ -412,7 +412,10 @@ export default function App() {
             feeRecords={feeRecords} 
             feeChallans={feeChallans}
             session={currentSession}
-            onRecordFee={(record) => setFeeRecords(prev => [...prev, record])}
+            onRecordFee={(record, updatedStudent) => {
+              setFeeRecords(prev => [...prev, record]);
+              setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+            }}
             onSaveChallans={(newChallans) => setFeeChallans(prev => [...prev, ...newChallans])}
             onDeleteChallan={(id) => setFeeChallans(prev => prev.filter(c => c.id !== id))}
             onUpdateChallan={(challan) => setFeeChallans(prev => prev.map(c => c.id === challan.id ? challan : c))}
@@ -1060,6 +1063,16 @@ function StudentsView({ students, onAddStudent, onDeleteStudent }: { students: S
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Roll ID</Label>
                     <Input value={formData.rollNumber} onChange={(e) => setFormData({...formData, rollNumber: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-transparent transition-all font-bold" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Previous Arrears (Baqaya)</Label>
+                    <Input type="number" value={formData.arrears} onChange={(e) => setFormData({...formData, arrears: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold" placeholder="0" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Arrears Description</Label>
+                    <Input value={formData.arrearsDescription} onChange={(e) => setFormData({...formData, arrearsDescription: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-transparent focus:bg-white focus:border-accent/20 transition-all font-bold" placeholder="e.g. Last year dues" />
                   </div>
                 </div>
                 <Button type="submit" className="w-full h-16 bg-accent font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-accent/20 text-xs">
@@ -1934,7 +1947,7 @@ function FeesView({
   feeRecords: FeeRecord[], 
   feeChallans: FeeChallan[],
   session: string,
-  onRecordFee: (r: FeeRecord) => void,
+  onRecordFee: (r: FeeRecord, s: Student) => void,
   onSaveChallans: (c: FeeChallan[]) => void,
   onDeleteChallan: (id: string) => void,
   onUpdateChallan: (as: FeeChallan) => void
@@ -2058,21 +2071,35 @@ function FeesView({
     e.preventDefault();
     if (!selectedStudent) return;
 
+    const paidAmount = Number(feeForm.amount);
+    const monthlyFee = Number(selectedStudent.monthlyFee) || 0;
+    const currentArrears = Number(selectedStudent.arrears) || 0;
+    const totalDue = monthlyFee + currentArrears;
+    
+    // Remaining balance becomes new arrears
+    const newArrears = totalDue - paidAmount;
+
     const newRecord: FeeRecord = {
       id: Math.random().toString(36).substr(2, 9),
       studentId: selectedStudent.id,
-      amount: Number(feeForm.amount),
+      amount: paidAmount,
       month: feeForm.month,
       year: Number(feeForm.year),
       status: 'paid',
       paymentDate: new Date().toISOString().split('T')[0],
     };
 
-    onRecordFee(newRecord);
+    const updatedStudent: Student = {
+      ...selectedStudent,
+      arrears: newArrears,
+      arrearsDescription: newArrears > 0 ? `Remaining balance from ${feeForm.month} payment` : ''
+    };
+
+    onRecordFee(newRecord, updatedStudent);
     setOpenRecord(false);
     
     // Generate WhatsApp Link in Urdu
-    const message = `اسلام علیکم! آپ کے بچے ${selectedStudent.name} کی فیس مبلغ ${feeForm.amount} روپے برائے مہینہ ${feeForm.month} وصول کر لی گئی ہے۔ شکریہ۔`;
+    const message = `اسلام علیکم! آپ کے بچے ${selectedStudent.name} کی فیس مبلغ ${paidAmount} روپے برائے مہینہ ${feeForm.month} وصول کر لی گئی ہے۔ ${newArrears > 0 ? `بقیہ واجب الادا رقم: ${newArrears} روپے۔` : ''} شکریہ۔`;
     const waLink = `https://wa.me/${selectedStudent.parentContact.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(waLink, '_blank');
   };
@@ -2301,8 +2328,9 @@ function FeesView({
               <thead>
                 <tr className="bg-slate-50/50">
                   <th className="px-8 py-5 font-bold uppercase text-[10px] text-slate-400 tracking-widest">Student</th>
-                  <th className="px-8 py-5 font-bold uppercase text-[10px] text-slate-400 tracking-widest">Roll No</th>
                   <th className="px-8 py-5 font-bold uppercase text-[10px] text-slate-400 tracking-widest">Monthly Fee</th>
+                  <th className="px-8 py-5 font-bold uppercase text-[10px] text-slate-400 tracking-widest">Arrears</th>
+                  <th className="px-8 py-5 font-bold uppercase text-[10px] text-slate-400 tracking-widest text-blue-600">Total Payable</th>
                   <th className="px-8 py-5 font-bold uppercase text-[10px] text-slate-400 tracking-widest text-center">Dues Status</th>
                   <th className="px-8 py-5 font-bold uppercase text-[10px] text-slate-400 tracking-widest text-right">Action</th>
                 </tr>
@@ -2319,10 +2347,15 @@ function FeesView({
                     <tr key={student.id} className="hover:bg-slate-50/30 transition-colors">
                       <td className="px-8 py-5">
                         <p className="font-bold text-slate-900 leading-none mb-1">{student.name}</p>
-                        <p className="text-[10px] font-medium text-slate-400">Grade: {student.grade} - {student.section}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-[10px] font-medium text-slate-400">Grade: {student.grade} - {student.section}</p>
+                          <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                          <p className="text-[10px] font-bold text-accent">Roll: {student.rollNumber}</p>
+                        </div>
                       </td>
-                      <td className="px-8 py-5 text-slate-500 font-mono text-xs">{student.rollNumber}</td>
                       <td className="px-8 py-5 font-bold text-slate-700">Rs. {(Number(student.monthlyFee) || 0).toLocaleString()}</td>
+                      <td className="px-8 py-5 font-bold text-rose-500">Rs. {(Number(student.arrears) || 0).toLocaleString()}</td>
+                      <td className="px-8 py-5 font-black text-blue-600">Rs. {( (Number(student.monthlyFee) || 0) + (Number(student.arrears) || 0) ).toLocaleString()}</td>
                       <td className="px-8 py-5 text-center">
                         <Badge className={cn("px-4 py-1 rounded-full font-bold text-[9px] uppercase tracking-widest border-none", currentMonthPaid ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500")}>
                           {currentMonthPaid ? 'Paid' : 'Unpaid'}
@@ -2338,7 +2371,8 @@ function FeesView({
                             size="sm" 
                             onClick={() => {
                               setSelectedStudent(student);
-                              setFeeForm(prev => ({ ...prev, amount: student.monthlyFee.toString() }));
+                              const totalDue = (Number(student.monthlyFee) || 0) + (Number(student.arrears) || 0);
+                              setFeeForm(prev => ({ ...prev, amount: totalDue.toString() }));
                               setOpenRecord(true);
                             }}
                             className="h-8 border-blue-100 text-blue-600 hover:bg-blue-50 text-[9px] font-bold uppercase tracking-widest rounded-lg"
@@ -2654,9 +2688,24 @@ function FeesView({
             <DialogDescription>Enter payment details to update student records.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleRecordFee} className="space-y-4 py-4">
+            <div className="bg-slate-50 p-4 rounded-xl space-y-2 mb-2">
+              <div className="flex justify-between text-[11px] font-bold">
+                <span className="text-slate-400 uppercase tracking-widest">Monthly Fee</span>
+                <span className="text-slate-900">Rs. {selectedStudent?.monthlyFee.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-[11px] font-bold">
+                <span className="text-slate-400 uppercase tracking-widest">Prev. Arrears</span>
+                <span className="text-rose-600">Rs. {(selectedStudent?.arrears || 0).toLocaleString()}</span>
+              </div>
+              <div className="h-px bg-slate-200 mt-2" />
+              <div className="flex justify-between text-sm font-black pt-1">
+                <span className="text-slate-900 uppercase tracking-widest">Total Dues</span>
+                <span className="text-blue-600">Rs. {(Number(selectedStudent?.monthlyFee || 0) + Number(selectedStudent?.arrears || 0)).toLocaleString()}</span>
+              </div>
+            </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="amount" className="text-right text-xs">Amount</Label>
-              <Input id="amount" type="number" value={feeForm.amount} onChange={(e) => setFeeForm({...feeForm, amount: e.target.value})} className="col-span-3 h-9 text-xs" required />
+              <Label htmlFor="amount" className="text-right text-xs font-bold uppercase text-slate-400">Payment</Label>
+              <Input id="amount" type="number" value={feeForm.amount} onChange={(e) => setFeeForm({...feeForm, amount: e.target.value})} className="col-span-3 h-12 rounded-xl text-sm font-bold" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right text-xs">Month</Label>
