@@ -46,6 +46,35 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+
+    /* Custom Gradient Colors */
+    --color-soft-blue-start: #E0E7FF;
+    --color-soft-blue-end: #EEF2FF;
+    --color-soft-indigo-start: #EEF2FF;
+    --color-soft-indigo-end: #F5F3FF;
+    --color-soft-emerald-start: #ECFDF5;
+    --color-soft-emerald-end: #F0FDFA;
+}
+
+@layer utilities {
+  .bg-glass {
+    @apply bg-white/70 backdrop-blur-md border border-white/20;
+  }
+  .bg-soft-blue-gradient {
+    background: linear-gradient(135deg, var(--color-soft-blue-start), var(--color-soft-blue-end));
+  }
+  .bg-soft-indigo-gradient {
+    background: linear-gradient(135deg, var(--color-soft-indigo-start), var(--color-soft-indigo-end));
+  }
+  .bg-soft-emerald-gradient {
+    background: linear-gradient(135deg, var(--color-soft-emerald-start), var(--color-soft-emerald-end));
+  }
+  .sidebar-gradient {
+    background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+  }
+  .text-gradient-indigo {
+    @apply bg-clip-text text-transparent bg-linear-to-r from-indigo-600 to-blue-600;
+  }
 }
 
 :root {

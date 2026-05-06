@@ -4,6 +4,7 @@ import path from "path";
 import pg from "pg";
 import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
+import fs from "fs";
 
 dotenv.config();
 
@@ -14,12 +15,14 @@ function toCamelCase(rows: any[]) {
   return rows.map(row => {
     const camelCased: any = {};
     for (const key in row) {
-      const camelKey = key.replace(/([-_][a-z])/ig, ($1) => {
-        return $1.toUpperCase()
-          .replace('-', '')
-          .replace('_', '');
-      });
-      camelCased[camelKey] = row[key];
+      if (Object.prototype.hasOwnProperty.call(row, key)) {
+        const camelKey = key.replace(/([-_][a-z])/ig, ($1) => {
+          return $1.toUpperCase()
+            .replace("-", "")
+            .replace("_", "");
+        });
+        camelCased[camelKey] = row[key];
+      }
     }
     return camelCased;
   });
@@ -32,14 +35,19 @@ function getPool() {
   if (!pool) {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
-      console.warn("DATABASE_URL not found. Database functionality will be unavailable.");
+      console.warn("DATABASE_URL not found. Database functionality will be limited to internal state until configured.");
       return null;
     }
     pool = new Pool({
       connectionString,
-      ssl: {
-        rejectUnauthorized: false // Required for most cloud DBs like Supabase
-      }
+      ssl: connectionString.includes("supabase") || connectionString.includes("require") ? {
+        rejectUnauthorized: false 
+      } : false,
+      connectionTimeoutMillis: 5000, // 5 second timeout
+    });
+    
+    pool.on('error', (err) => {
+      console.error('Unexpected error on idle client', err);
     });
   }
   return pool;
@@ -70,6 +78,9 @@ async function startServer() {
       } catch (err: any) {
         dbError = err.message;
         console.error("Database health check failed:", err.message);
+        if (err.code === 'ECONNREFUSED') {
+          dbError = "Database connection refused. Check your DATABASE_URL and database availability.";
+        }
       }
     }
 
@@ -77,6 +88,7 @@ async function startServer() {
       status: "ok", 
       database: dbStatus,
       databaseConfigured: !!process.env.DATABASE_URL,
+      type: "postgresql",
       error: dbError
     });
   });
@@ -96,6 +108,7 @@ async function startServer() {
       if (!isValid) {
         return res.status(401).json({ error: "Invalid login ID or password" });
       }
+
       const profile = toCamelCase([user])[0];
       delete profile.passwordHash;
       res.json(profile);
@@ -113,9 +126,8 @@ async function startServer() {
     try {
       const result = await db.query("SELECT * FROM students ORDER BY name ASC");
       res.json(toCamelCase(result.rows));
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal Server Error" });
+    } catch (err: any) {
+      handleDbError(err, res);
     }
   });
 
@@ -125,18 +137,18 @@ async function startServer() {
 
     const { id, name, email, rollNumber, grade, section, parentName, parentContact, address, dateOfBirth, monthlyFee, arrears } = req.body;
     try {
+      const finalId = id || Math.random().toString(36).substring(2, 11);
       const result = await db.query(
         `INSERT INTO students (id, name, email, roll_number, grade, section, parent_name, parent_contact, address, date_of_birth, monthly_fee, arrears) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) 
          ON CONFLICT (id) DO UPDATE SET 
          name=$2, email=$3, roll_number=$4, grade=$5, section=$6, parent_name=$7, parent_contact=$8, address=$9, date_of_birth=$10, monthly_fee=$11, arrears=$12
          RETURNING *`,
-        [id || Math.random().toString(36).substr(2, 9), name, email, rollNumber, grade, section, parentName, parentContact, address, dateOfBirth, monthlyFee, arrears || 0]
+        [finalId, name, email, rollNumber, grade, section, parentName, parentContact, address, dateOfBirth, monthlyFee, arrears || 0]
       );
       res.status(201).json(toCamelCase(result.rows)[0]);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal Server Error" });
+    } catch (err: any) {
+      handleDbError(err, res);
     }
   });
 
@@ -148,8 +160,7 @@ async function startServer() {
       const result = await db.query("SELECT * FROM teachers ORDER BY name ASC");
       res.json(toCamelCase(result.rows));
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal Server Error" });
+      handleDbError(err, res);
     }
   });
 
@@ -161,41 +172,35 @@ async function startServer() {
       subject, qualification, loginId, password, role, 
       assignedClass, isTeaching 
     } = req.body;
-    
+
     try {
       let passwordHash = null;
       if (password) {
         passwordHash = await bcrypt.hash(password, 10);
       }
 
-      // Check if update or insert
-      const existing = await db.query("SELECT * FROM teachers WHERE id = $1", [id]);
+      const finalId = id || Math.random().toString(36).substring(2, 11);
       
       let result;
-      if (existing.rows.length > 0) {
-        // Update
-        const query = `
-          UPDATE teachers SET 
-          name=$2, email=$3, contact_number=$4, designation=$5, base_salary=$6, 
-          subject=$7, qualification=$8, login_id=$9, role=$10, assigned_class=$11, is_teaching=$12
-          ${passwordHash ? ', password_hash=$13' : ''}
-          WHERE id=$1
-          RETURNING *
-        `;
-        const params = [
-          id, name, email, contactNumber, designation, baseSalary, 
-          subject, qualification, loginId, role, assignedClass, isTeaching
-        ];
-        if (passwordHash) params.push(passwordHash);
-        result = await db.query(query, params);
-      } else {
-        // Insert
+      if (passwordHash) {
         result = await db.query(
           `INSERT INTO teachers 
            (id, name, email, contact_number, designation, base_salary, subject, qualification, login_id, password_hash, role, assigned_class, is_teaching) 
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) 
+           ON CONFLICT (id) DO UPDATE SET 
+           name=$2, email=$3, contact_number=$4, designation=$5, base_salary=$6, subject=$7, qualification=$8, login_id=$9, password_hash=$10, role=$11, assigned_class=$12, is_teaching=$13
            RETURNING *`,
-          [id || Math.random().toString(36).substr(2, 9), name, email, contactNumber, designation, baseSalary, subject, qualification, loginId, passwordHash, role, assignedClass, isTeaching]
+          [finalId, name, email, contactNumber, designation, baseSalary, subject, qualification, loginId, passwordHash, role, assignedClass, isTeaching]
+        );
+      } else {
+        result = await db.query(
+          `INSERT INTO teachers 
+           (id, name, email, contact_number, designation, base_salary, subject, qualification, login_id, role, assigned_class, is_teaching) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) 
+           ON CONFLICT (id) DO UPDATE SET 
+           name=$2, email=$3, contact_number=$4, designation=$5, base_salary=$6, subject=$7, qualification=$8, login_id=$9, role=$10, assigned_class=$11, is_teaching=$12
+           RETURNING *`,
+          [finalId, name, email, contactNumber, designation, baseSalary, subject, qualification, loginId, role, assignedClass, isTeaching]
         );
       }
       
@@ -221,8 +226,7 @@ async function startServer() {
       `);
       res.json(toCamelCase(result.rows));
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal Server Error" });
+      handleDbError(err, res);
     }
   });
 
@@ -231,18 +235,18 @@ async function startServer() {
     if (!db) return res.status(503).json({ error: "Database not configured" });
     const { id, studentId, amount, paymentDate, month, year, status } = req.body;
     try {
+      const finalId = id || Math.random().toString(36).substring(2, 11);
       const result = await db.query(
         `INSERT INTO fee_records (id, student_id, amount, payment_date, month, year, status) 
          VALUES ($1, $2, $3, $4, $5, $6, $7) 
          ON CONFLICT (id) DO UPDATE SET 
          amount=$3, payment_date=$4, month=$5, year=$6, status=$7
          RETURNING *`,
-        [id || Math.random().toString(36).substr(2, 9), studentId, amount, paymentDate, month, year, status]
+        [finalId, studentId, amount, paymentDate, month, year, status]
       );
       res.status(201).json(toCamelCase(result.rows)[0]);
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal Server Error" });
+      handleDbError(err, res);
     }
   });
 
@@ -254,8 +258,7 @@ async function startServer() {
       const result = await db.query("SELECT * FROM transactions ORDER BY date DESC");
       res.json(toCamelCase(result.rows));
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal Server Error" });
+      handleDbError(err, res);
     }
   });
 
@@ -264,18 +267,18 @@ async function startServer() {
     if (!db) return res.status(503).json({ error: "Database not configured" });
     const { id, type, category, amount, description, date, month, year, studentId } = req.body;
     try {
+      const finalId = id || Math.random().toString(36).substring(2, 11);
       const result = await db.query(
         `INSERT INTO transactions (id, type, category, amount, description, date, month, year, student_id) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
          ON CONFLICT (id) DO UPDATE SET 
          type=$2, category=$3, amount=$4, description=$5, date=$6, month=$7, year=$8, student_id=$9
          RETURNING *`,
-        [id || Math.random().toString(36).substr(2, 9), type, category, amount, description, date, month, year, studentId]
+        [finalId, type, category, amount, description, date, month, year, studentId]
       );
       res.status(201).json(toCamelCase(result.rows)[0]);
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal Server Error" });
+      handleDbError(err, res);
     }
   });
 
@@ -300,6 +303,17 @@ async function startServer() {
     }
   });
 
+  app.get("/api/attendance", async (req, res) => {
+    const db = getPool();
+    if (!db) return res.status(503).json({ error: "Database not configured" });
+    try {
+      const result = await db.query("SELECT * FROM attendance ORDER BY date DESC");
+      res.json(toCamelCase(result.rows));
+    } catch (err) {
+      handleDbError(err, res);
+    }
+  });
+
   // Inventory
   app.get("/api/inventory", async (req, res) => {
     const db = getPool();
@@ -308,8 +322,7 @@ async function startServer() {
       const result = await db.query("SELECT * FROM inventory ORDER BY item_name ASC");
       res.json(toCamelCase(result.rows));
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal Server Error" });
+      handleDbError(err, res);
     }
   });
 
@@ -318,28 +331,16 @@ async function startServer() {
     if (!db) return res.status(503).json({ error: "Database not configured" });
     const { id, itemName, category, purchasePrice, salePrice, stockQuantity, unit, minQuantity } = req.body;
     try {
+      const finalId = id || Math.random().toString(36).substring(2, 11);
       const result = await db.query(
         `INSERT INTO inventory (id, item_name, category, purchase_price, sale_price, stock_quantity, unit, min_quantity) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
          ON CONFLICT (id) DO UPDATE SET 
          item_name=$2, category=$3, purchase_price=$4, sale_price=$5, stock_quantity=$6, unit=$7, min_quantity=$8
          RETURNING *`,
-        [id || Math.random().toString(36).substr(2, 9), itemName, category, purchasePrice, salePrice, stockQuantity, unit, minQuantity]
+        [finalId, itemName, category, purchasePrice, salePrice, stockQuantity, unit, minQuantity]
       );
       res.status(201).json(toCamelCase(result.rows)[0]);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal Server Error" });
-    }
-  });
-
-  // Attendance GET
-  app.get("/api/attendance", async (req, res) => {
-    const db = getPool();
-    if (!db) return res.status(503).json({ error: "Database not configured" });
-    try {
-      const result = await db.query("SELECT * FROM attendance ORDER BY date DESC");
-      res.json(toCamelCase(result.rows));
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Internal Server Error" });
@@ -354,12 +355,15 @@ async function startServer() {
       const result = await db.query("SELECT * FROM school_settings");
       const settingsMap: any = {};
       result.rows.forEach(row => {
-        settingsMap[row.key] = row.value;
+        try {
+          settingsMap[row.key] = typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+        } catch {
+          settingsMap[row.key] = row.value;
+        }
       });
       res.json(settingsMap);
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal Server Error" });
+      handleDbError(err, res);
     }
   });
 
@@ -374,12 +378,43 @@ async function startServer() {
       );
       res.json({ success: true });
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal Server Error" });
+      handleDbError(err, res);
     }
   });
 
-  // Catch-all for undefined API routes to prevent HTML response
+  // Payroll
+  app.get("/api/payroll", async (req, res) => {
+    const db = getPool();
+    if (!db) return res.status(503).json({ error: "Database not configured" });
+    try {
+      const result = await db.query("SELECT * FROM payroll ORDER BY payment_date DESC");
+      res.json(toCamelCase(result.rows));
+    } catch (err) {
+      handleDbError(err, res);
+    }
+  });
+
+  app.post("/api/payroll", async (req, res) => {
+    const db = getPool();
+    if (!db) return res.status(503).json({ error: "Database not configured" });
+    const { id, teacherId, amount, paymentDate, month, year, status } = req.body;
+    try {
+      const finalId = id || Math.random().toString(36).substring(2, 11);
+      const result = await db.query(
+        `INSERT INTO payroll (id, teacher_id, amount, payment_date, month, year, status) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7) 
+         ON CONFLICT (id) DO UPDATE SET 
+         teacher_id=$2, amount=$3, payment_date=$4, month=$5, year=$6, status=$7
+         RETURNING *`,
+        [finalId, teacherId, amount, paymentDate, month, year, status]
+      );
+      res.status(201).json(toCamelCase(result.rows)[0]);
+    } catch (err) {
+      handleDbError(err, res);
+    }
+  });
+
+  // Catch-all for undefined API routes
   app.all("/api/*", (req, res) => {
     res.status(404).json({ error: `API route ${req.url} not found` });
   });
@@ -403,60 +438,44 @@ async function startServer() {
   const db = getPool();
   if (db) {
     try {
-      const { rows: studentsRows } = await db.query("SELECT to_regclass('public.students') as table_exists");
-      const { rows: settingsRows } = await db.query("SELECT to_regclass('public.school_settings') as table_exists");
+      console.log("Checking database schema...");
+      const schemaPath = path.join(process.cwd(), "schema.sql");
+      const sql = fs.readFileSync(schemaPath, "utf8");
       
-      if (!studentsRows[0].table_exists || !settingsRows[0].table_exists) {
-        console.log("Initializing database with missing tables...");
-        const schema = path.join(process.cwd(), "schema.sql");
-        const fs = await import("fs");
-        let sql = fs.readFileSync(schema, "utf8");
-        
-        // schema.sql already has IF NOT EXISTS, so no need to replace
-        
-        await db.query(sql);
-        console.log("Database initialized/updated successfully.");
+      await db.query(sql);
+      console.log("Database initialized/updated successfully.");
+
+      // Seed default principal if not exists
+      const checkRes = await db.query("SELECT * FROM teachers WHERE login_id = $1", ["jahanzeb"]);
+      if (checkRes.rows.length === 0) {
+        const passHash = await bcrypt.hash("123", 10);
+        await db.query(
+          `INSERT INTO teachers (id, name, email, role, login_id, password_hash, designation, is_teaching) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          ["admin_default", "Muhammad Jahanzeb", "principal@alnaseeha.edu", "principal", "jahanzeb", passHash, "Principal", false]
+        );
+        console.log("Default principal account created: [jahanzeb / 123]");
       }
     } catch (err: any) {
-      console.error("Database initialization check failed. Error:", err.message);
-      // Fallback: try to create school_settings specifically if it's the one blocking
-      try {
-        const db = getPool();
-        if (db) {
-          await db.query(`
-            CREATE TABLE IF NOT EXISTS school_settings (
-                key TEXT PRIMARY KEY,
-                value JSONB NOT NULL,
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
-          `);
-          console.log("Fallback: school_settings table created/verified.");
-        }
-      } catch (fallbackErr: any) {
-        console.error("Fallback initialization also failed:", fallbackErr.message);
-      }
+      console.error("Database initialization failed:", err.message);
     }
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-    
-    // Seed default principal if not exists
-    const db = getPool();
-    if (db) {
-      db.query("SELECT * FROM teachers WHERE login_id = $1", ['jahanzeb']).then(async (res) => {
-        if (res.rows.length === 0) {
-          const passHash = await bcrypt.hash("123", 10);
-          await db.query(
-            `INSERT INTO teachers (id, name, email, role, login_id, password_hash, designation, is_teaching) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            ['admin_default', 'Muhammad Jahanzeb', 'principal@alnaseeha.edu', 'principal', 'jahanzeb', passHash, 'Principal', false]
-          );
-          console.log("Default principal account created/verified: [jahanzeb / 123]");
-        }
-      }).catch(err => console.error("Error seeding principal:", err));
-    }
+    console.log(`Server running on http://localhost:${PORT} (PostgreSQL Mode)`);
   });
+}
+
+function handleDbError(err: any, res: express.Response) {
+  console.error("Database operation failed:", err.message);
+  if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT') {
+    return res.status(503).json({ 
+      error: "Database connection failed", 
+      message: "The database server is currently unreachable. Please check your connection or database status.",
+      code: err.code 
+    });
+  }
+  res.status(500).json({ error: "Internal Server Error", message: err.message });
 }
 
 startServer();

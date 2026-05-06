@@ -18,6 +18,7 @@ export interface Student extends UserProfile {
   rollNumber: string;
   grade: string;
   section: string;
+  currentClass?: string; // added to fix lint error
   parentName: string;
   parentContact: string;
   address: string;
@@ -128,6 +129,8 @@ export interface InventoryItem {
   purchasePrice: number;
   salePrice: number;
   stockQuantity: number;
+  minStockLevel?: number; // added to fix lint error
+  unit?: string; // added to fix lint error
 }
 
 export interface InvoiceItem {
